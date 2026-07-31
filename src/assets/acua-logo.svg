@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#e8eef4"/>
+  <g transform="translate(256 248) scale(0.86) translate(-256 -248)">
+    <g fill="none" stroke="#22b3c6" stroke-width="21" stroke-linecap="butt" stroke-linejoin="miter">
+      <!-- A -->
+      <path d="M64 336 L104 176 L144 336 M78 282 L130 282"/>
+      <!-- C -->
+      <path d="M250 200 A68 78 0 1 0 250 312" stroke-linecap="round"/>
+      <!-- U -->
+      <path d="M282 176 L282 292 A43 43 0 0 0 368 292 L368 176" stroke-linecap="round"/>
+      <!-- A -->
+      <path d="M392 336 L432 176 L472 336 M406 282 L458 282"/>
+    </g>
+  </g>
+  <text x="256" y="372" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="21" font-weight="600" letter-spacing="5" fill="#e389ae" text-anchor="middle">CAFÉ · RESTAURANT · LOUNGE</text>
+</svg>

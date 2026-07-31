@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Caisse desktop capabilities",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://acua-pos.vercel.app"]
+  },
+  "permissions": [
+    "core:default",
+    "autostart:default",
+    "allow-print-escpos",
+    "allow-print-escpos-usb",
+    "allow-list-printers"
+  ]
+}

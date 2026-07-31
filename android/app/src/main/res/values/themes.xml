@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- No action bar, light status bar background: the WebView IS the UI.
+         Plain framework Material theme — works from API 21 up, no AndroidX. -->
+    <!-- Dark status bar: its icons are always white on API 21-22, so a
+         light bar there would show white-on-white. -->
+    <style name="Theme.AcuaPos" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#1C1917</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+    </style>
+</resources>

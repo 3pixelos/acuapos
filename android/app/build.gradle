@@ -1,0 +1,34 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.acua.pos'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.acua.pos"
+        // API 21 (Android 5.0) so the old staff phones can install it —
+        // the WebView comes from the system and updates via Play, so even
+        // ancient devices render the app fine regardless of Chrome version.
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            // No shrinking: the app is a single Activity, nothing to gain.
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+// Zero dependencies on purpose: plain android.app.Activity + WebView.
+// No AndroidX, no Kotlin — smallest possible APK, fastest build.

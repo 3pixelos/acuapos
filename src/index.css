@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Acua palette — from the logo: teal wordmark, pink tagline, pale-blue field */
+  --color-bg: #eef3f8; /* pale blue (logo background) */
+  --color-surface: #ffffff;
+  --color-surface-2: #fce7f0; /* light pink tint */
+  --color-ink: #22333f; /* deep teal-slate near-black */
+  --color-ink-2: #566572;
+  --color-ink-3: #9fb0bb;
+  --color-line: #e3ecf1; /* pale-blue hairline */
+  --color-line-2: #d3e0e7;
+  --color-accent: #16a5b8; /* logo teal — primary actions (white text) */
+  --color-accent-soft: #dcf3f6; /* teal wash */
+  --color-pink: #e389ae; /* logo pink — secondary highlight */
+  --color-pink-soft: #fbe4ee;
+
+  /* Table statuses */
+  --color-st-waiting: #d97706;
+  --color-st-waiting-soft: #fef3c7;
+  --color-st-preparing: #2563eb;
+  --color-st-preparing-soft: #dbeafe;
+  --color-st-served: #16a34a;
+  --color-st-served-soft: #dcfce7;
+  --color-st-late: #dc2626;
+  --color-st-late-soft: #fee2e2;
+
+  --color-danger: #dc2626; /* clear red — distinct from the brand pink */
+
+  --radius-card: 14px;
+
+  --shadow-1: 0 1px 2px rgb(53 68 90 / 0.05), 0 4px 12px rgb(53 68 90 / 0.06);
+  --shadow-2: 0 8px 28px rgb(53 68 90 / 0.12);
+  --shadow-3: 0 20px 50px rgb(53 68 90 / 0.2);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* iOS Safari zooms the page on focus if a field's font-size is under 16px.
+   Force 16px on every text field (even against a smaller Tailwind text-*
+   utility) so typing never triggers that zoom — keeps the layout stable
+   without disabling user pinch-zoom. */
+input,
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Late table pulse */
+@keyframes late-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(220 38 38 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(220 38 38 / 0.25);
+  }
+}
+.late-pulse {
+  animation: late-pulse 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .late-pulse {
+    animation: none;
+  }
+}
+
+/* Drawer / modal animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(24px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes slide-in-up {
+  from {
+    transform: translateY(28px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-drawer {
+  animation: slide-in-right 0.2s ease-out;
+}
+.anim-sheet {
+  animation: slide-in-up 0.22s ease-out;
+}
+.anim-fade {
+  animation: fade-in 0.15s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-drawer,
+  .anim-sheet,
+  .anim-fade {
+    animation: none;
+  }
+}
+
+/* ------- printing: only the ticket prints ------- */
+#print-root {
+  display: none;
+}
+@media print {
+  body > #root {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+  }
+  /* Receipt ratio (80mm thermal roll), not a full A4/Letter page. */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  .ticket-print {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #000;
+    width: 100%;
+    padding: 3mm 4mm;
+    box-sizing: border-box;
+  }
+}

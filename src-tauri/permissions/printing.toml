@@ -1,0 +1,20 @@
+# Application permissions for the printing commands. Required since the
+# caisse window loads the live site (remote URL): Tauri v2's ACL denies
+# custom commands to remote origins unless a capability explicitly grants
+# them — which broke ALL printing ("command list_printers not allowed by
+# ACL", and the kitchen/bar service failing the same way silently).
+
+[[permission]]
+identifier = "allow-print-escpos"
+description = "Raw ESC/POS over TCP to the network thermal printers (kitchen/bar)."
+commands.allow = ["print_escpos"]
+
+[[permission]]
+identifier = "allow-print-escpos-usb"
+description = "Raw ESC/POS to a Windows-installed printer (USB cashier printer)."
+commands.allow = ["print_escpos_usb"]
+
+[[permission]]
+identifier = "allow-list-printers"
+description = "Enumerate Windows printers for the settings dropdown."
+commands.allow = ["list_printers"]
