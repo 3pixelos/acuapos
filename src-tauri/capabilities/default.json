@@ -4,7 +4,7 @@
   "description": "Caisse desktop capabilities",
   "windows": ["main"],
   "remote": {
-    "urls": ["https://acua-pos.vercel.app"]
+    "urls": ["https://acuapos.vercel.app"]
   },
   "permissions": [
     "core:default",

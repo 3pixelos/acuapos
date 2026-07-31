@@ -13,8 +13,9 @@ const VAPID_PUBLIC =
   'BMvpHwJ2oJcCX0DCNy7lbEvi7IHokqqLDFpA8uYwVGmBLFnDM0s6lDtpI8JtXuHYxTxW5iTff8TNL8-r3lP8jIA'
 
 // Absolute so it resolves from the Tauri desktop app too (not just the web).
-// TODO(client): point this at Acua's own deployed notify endpoint.
-const NOTIFY_ENDPOINT = 'https://acua-pos.vercel.app/api/notify'
+// Points at Acua's Vercel deployment; `api/notify.js` must be deployed there
+// with the VAPID private key set in its env for push to actually send.
+const NOTIFY_ENDPOINT = 'https://acuapos.vercel.app/api/notify'
 
 export function pushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window

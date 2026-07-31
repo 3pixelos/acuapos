@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "Acua POS — Caisse",
-        "url": "https://acua-pos.vercel.app",
+        "url": "https://acuapos.vercel.app",
         "width": 1280,
         "height": 820,
         "minWidth": 900,

@@ -20,7 +20,7 @@ import android.webkit.WebViewClient;
  */
 public class MainActivity extends Activity {
 
-    private static final String APP_URL = "https://acua-pos.vercel.app";
+    private static final String APP_URL = "https://acuapos.vercel.app";
 
     private WebView webView;
 

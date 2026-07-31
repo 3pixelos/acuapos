@@ -116,6 +116,8 @@ pale-blue field) is applied everywhere, recreated as vector art in
   placeholder notify URL. Generate a fresh keypair
   (`npx web-push generate-vapid-keys`), deploy Acua's own `api/notify.js`, and
   set the private key in that function's env.
-- **Deployed URLs** — Tauri (`tauri.conf.json`, `capabilities/default.json`) and
-  Android (`MainActivity.java`) load `https://acua-pos.vercel.app` — repoint
-  once Acua is deployed.
+- **Deployment** — the desktop (Tauri: `tauri.conf.json` window `url` +
+  `capabilities/default.json` `remote.urls`) and Android (`MainActivity.java`
+  `APP_URL`) shells load the **remote** `https://acuapos.vercel.app` — they are
+  thin wrappers, so every Vercel web deploy updates them with no reinstall. Just
+  make sure that Vercel project is live and serving the app.
