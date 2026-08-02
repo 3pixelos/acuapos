@@ -5,36 +5,53 @@ import type { Branch } from '../lib/types'
 export type PaperWidth = 58 | 80
 
 interface PrinterState {
+  /** Kitchen printer — the only NETWORK one. Wireless/LAN, raw TCP :9100.
+   * Prints food tickets and nothing else. */
   kitchenIp: string
-  /** Bar printer (wireless, TCP :9100 like the kitchen). Gets a separate
-   * ticket with only the drinks of each order. */
-  barIp: string
-  /** Sweets/desserts printer (wireless, TCP :9100). Gets its own ticket
-   * with only the dessert items. Empty = desserts fall back to the bar
-   * printer, which is where they used to print. */
-  sweetsIp: string
+  /** Bar printer — Windows-installed printer NAME, not an IP. It is cabled
+   * to the bar's own till, so it is reached through the Windows spooler
+   * exactly like the cashier printer (a shared printer from the bar PC shows
+   * up in the same dropdown). It prints two things: the drink lines of every
+   * order, and the bill of any table standing on the BAR floor. */
+  barPrinterName: string
   /** Windows-installed printer name for the cashier/bill printer — it's
    * USB-cabled to the till PC, not on the network, so we print straight to
-   * the Windows spooler instead of TCP. */
+   * the Windows spooler instead of TCP. Prints the full receipts. */
   cashierPrinterName: string
+  /** WHICH STATIONS THIS MACHINE IS RESPONSIBLE FOR.
+   *
+   * There are two tills running the desktop app: the main caisse (kitchen
+   * printer on the LAN + its own bill printer) and the bar's caisse (bar
+   * printer on its cable). Both watch the same `order_items` queue, so
+   * without this they would each print EVERY ticket — the kitchen would get
+   * two copies of every dish and the bar two of every drink.
+   *
+   * Each machine ticks only the stations it actually serves. The service
+   * then ignores tickets for stations it doesn't own and, crucially, never
+   * stamps `printed_at` on them — so the other till still picks them up.
+   *
+   * The two tills' selections must not overlap. Nothing enforces that (a
+   * till has no way to know what the other one is set to); the settings
+   * screen spells it out instead. */
+  printsKitchen: boolean
+  printsBar: boolean
   paperWidth: PaperWidth
   /** Live status of the ticket printers, surfaced as badges on the Caisse
    * UI (there's no screen at the kitchen/bar to show it). Not persisted. */
   kitchenOnline: boolean
   barOnline: boolean
-  sweetsOnline: boolean
   /** How many unprinted tickets are currently queued/failing. */
   queued: number
   setConfig: (c: {
     kitchenIp?: string
-    barIp?: string
-    sweetsIp?: string
+    barPrinterName?: string
     cashierPrinterName?: string
+    printsKitchen?: boolean
+    printsBar?: boolean
     paperWidth?: PaperWidth
   }) => void
   setKitchenOnline: (online: boolean) => void
   setBarOnline: (online: boolean) => void
-  setSweetsOnline: (online: boolean) => void
   setQueued: (n: number) => void
   /** Which location's printer set is currently loaded. Loaded on login; null
    * before anyone has signed in. */
@@ -50,7 +67,12 @@ const keyFor = (branch: Branch | null) => (branch ? `${LEGACY_KEY}.${branch}` : 
 
 type StoredConfig = Pick<
   PrinterState,
-  'kitchenIp' | 'barIp' | 'sweetsIp' | 'cashierPrinterName' | 'paperWidth'
+  | 'kitchenIp'
+  | 'barPrinterName'
+  | 'cashierPrinterName'
+  | 'printsKitchen'
+  | 'printsBar'
+  | 'paperWidth'
 >
 
 function readRaw(key: string): StoredConfig | null {
@@ -59,16 +81,26 @@ function readRaw(key: string): StoredConfig | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as {
       kitchenIp?: string
+      barPrinterName?: string
+      /** Pre-2026-08 shape: the bar was a network printer with an IP, and
+       * desserts had a third printer of their own. Both are gone — an IP is
+       * meaningless as a Windows printer name, so it is dropped rather than
+       * migrated, and the cashier picks the bar printer from the dropdown. */
       barIp?: string
-      sweetsIp?: string
       cashierPrinterName?: string
+      printsKitchen?: boolean
+      printsBar?: boolean
       paperWidth?: PaperWidth
     }
     return {
       kitchenIp: parsed.kitchenIp ?? '',
-      barIp: parsed.barIp ?? '',
-      sweetsIp: parsed.sweetsIp ?? '',
+      barPrinterName: parsed.barPrinterName ?? '',
       cashierPrinterName: parsed.cashierPrinterName ?? '',
+      // A config saved before stations existed came from a single-till
+      // setup, where that one machine printed everything. Defaulting to
+      // both keeps it behaving exactly as it did.
+      printsKitchen: parsed.printsKitchen ?? true,
+      printsBar: parsed.printsBar ?? true,
       paperWidth: parsed.paperWidth ?? (80 as PaperWidth),
     }
   } catch {
@@ -78,22 +110,19 @@ function readRaw(key: string): StoredConfig | null {
 
 const EMPTY: StoredConfig = {
   kitchenIp: '',
-  barIp: '',
-  sweetsIp: '',
+  barPrinterName: '',
   cashierPrinterName: '',
+  printsKitchen: true,
+  printsBar: true,
   paperWidth: 80 as PaperWidth,
 }
 
 /** The config for a branch: its own saved set, or — the first load only —
  * the pre-branch shared config, so an existing till never comes up blank.
  *
- * A blank config is not harmless: with no bar IP, drinks fall back to the
- * KITCHEN printer, and with no sweets IP, desserts fall back to the BAR. So
- * whenever a branch has no saved set yet we seed it from the old shared key
- * rather than EMPTY. Branch tills are separate machines, each carrying its
- * own device's legacy config, so each seeds from the right printers; a single
- * machine used for both branches seeds both the same and the cashier then
- * adjusts — exactly the behaviour before per-branch config existed. */
+ * A blank config is not harmless: with no bar printer chosen, drinks fall
+ * back to the KITCHEN printer. So whenever a branch has no saved set yet we
+ * seed it from the old shared key rather than EMPTY. */
 function restoreForBranch(branch: Branch | null): StoredConfig {
   const own = readRaw(keyFor(branch))
   if (own) return own
@@ -116,9 +145,10 @@ function persist(branch: Branch | null, s: StoredConfig) {
       keyFor(branch),
       JSON.stringify({
         kitchenIp: s.kitchenIp,
-        barIp: s.barIp,
-        sweetsIp: s.sweetsIp,
+        barPrinterName: s.barPrinterName,
         cashierPrinterName: s.cashierPrinterName,
+        printsKitchen: s.printsKitchen,
+        printsBar: s.printsBar,
         paperWidth: s.paperWidth,
       }),
     )
@@ -131,14 +161,14 @@ export const usePrinter = create<PrinterState>((set, get) => ({
   ...restore(),
   kitchenOnline: true,
   barOnline: true,
-  sweetsOnline: true,
   queued: 0,
   setConfig: (c) => {
     const next: StoredConfig = {
       kitchenIp: c.kitchenIp ?? get().kitchenIp,
-      barIp: c.barIp ?? get().barIp,
-      sweetsIp: c.sweetsIp ?? get().sweetsIp,
+      barPrinterName: c.barPrinterName ?? get().barPrinterName,
       cashierPrinterName: c.cashierPrinterName ?? get().cashierPrinterName,
+      printsKitchen: c.printsKitchen ?? get().printsKitchen,
+      printsBar: c.printsBar ?? get().printsBar,
       paperWidth: c.paperWidth ?? get().paperWidth,
     }
     persist(get().branch, next) // save under the branch currently loaded
@@ -152,7 +182,6 @@ export const usePrinter = create<PrinterState>((set, get) => ({
   },
   setKitchenOnline: (kitchenOnline) => set({ kitchenOnline }),
   setBarOnline: (barOnline) => set({ barOnline }),
-  setSweetsOnline: (sweetsOnline) => set({ sweetsOnline }),
   setQueued: (queued) => set({ queued }),
 }))
 

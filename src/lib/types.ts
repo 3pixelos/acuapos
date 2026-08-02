@@ -26,14 +26,21 @@ export interface Staff {
 }
 
 /** Floor "layers" (rooms). Ordering works identically in all of them — a
- * layer is purely where the table stands. */
-export type LayerId = 'terrasse' | 'salon' | 'etage2' | 'emporter' | 'vipsalon'
+ * layer is purely where the table stands, INCLUDING the bar: a bar table is
+ * seated, ordered and sent to the kitchen exactly like a salon one. The only
+ * thing the bar changes is where its ADDITION prints (see BAR_LAYER). */
+export type LayerId = 'frontdoor' | 'salon' | 'terrasse' | 'bar' | 'emporter'
 
 /** Which rooms the location has, in display order. The floor map and its
  * layer switcher are driven off this. */
 export const BRANCH_LAYERS: Record<Branch, LayerId[]> = {
-  main: ['salon', 'terrasse', 'etage2', 'emporter'],
+  main: ['frontdoor', 'salon', 'terrasse', 'bar', 'emporter'],
 }
+
+/** The bar floor. Its tables order like any other, but "Imprimer
+ * l'addition" sends their bill to the BAR printer instead of the caisse
+ * one — the barman settles their own floor without walking to the till. */
+export const BAR_LAYER: LayerId = 'bar'
 
 export interface RestaurantTable {
   id: string
@@ -198,8 +205,14 @@ export interface Payment {
 }
 
 /** Fixed main-category keys, in display order. Labels live in i18n
- * (`main_<key>`); subcategories point at one via menu_categories.main. */
-export const MENU_MAINS = ['breakfast', 'lunch', 'steaks', 'sweets', 'drinks'] as const
+ * (`main_<key>`); subcategories point at one via menu_categories.main.
+ *
+ * They are also the PRINT ROUTING: `food` prints in the kitchen, `drinks`
+ * at the bar (see kitchenPrintService). Keeping the split at exactly two
+ * means a new subcategory can never be routed wrong — whoever adds it only
+ * has to answer "kitchen or bar?", which is the same question the line
+ * cooks and the barman ask. */
+export const MENU_MAINS = ['food', 'drinks'] as const
 export type MenuMain = (typeof MENU_MAINS)[number]
 
 /** Sentinel category for the free drink included with Formulas / Turkish
@@ -249,9 +262,20 @@ export interface MenuCategory {
   id: string
   name_fr: string
   name_en: string
+  /** Spanish name. Optional so a DB that predates the Spanish column still
+   * loads — `catName` falls back to the English one. */
+  name_es?: string | null
   /** One of MENU_MAINS ('' on a DB that predates the mains migration). */
   main: string
   sort: number
+}
+
+/** A category's name in the UI language, falling back to English then
+ * French so a half-translated menu still renders something readable. */
+export function catName(c: MenuCategory, lang: string): string {
+  if (lang === 'es') return c.name_es || c.name_en || c.name_fr
+  if (lang === 'en') return c.name_en || c.name_fr
+  return c.name_fr || c.name_en
 }
 
 export interface MenuItem {

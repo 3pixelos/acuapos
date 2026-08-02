@@ -1,4 +1,7 @@
 .gradle/
 build/
 local.properties
+# Release signing material — never commit these.
 *.keystore
+*.jks
+keystore.properties

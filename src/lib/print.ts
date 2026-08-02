@@ -38,7 +38,7 @@ export function buildKitchenTicket(opts: {
   waiter: string
   items: OrderItem[]
   cols?: number
-  station?: 'CUISINE' | 'BAR' | 'DESSERTS'
+  station?: 'CUISINE' | 'BAR'
   /** Guests seated — printed on the station ticket so the line knows the
    * table size at a glance. */
   covers?: number
@@ -161,19 +161,19 @@ export function buildBill(
   p.rule(cols)
 
   if (discount > 0) {
-    p.line(lr('SOUS-TOTAL:', `${gross.toFixed(2)} DH`, cols))
+    p.line(lr('SOUS-TOTAL:', `${gross.toFixed(2)} €`, cols))
     // 100% = VIP: the whole order is offered
     const label = discount === 100 ? 'VIP (OFFERT):' : `REMISE -${discount}%:`
-    p.bold(true).line(lr(label, `-${(gross - total).toFixed(2)} DH`, cols)).bold(false)
+    p.bold(true).line(lr(label, `-${(gross - total).toFixed(2)} €`, cols)).bold(false)
   }
   p.bold(true).size(1, 1)
-  p.line(lr('TOTAL NET:', `${total.toFixed(2)} DH`, Math.floor(cols / 2)))
+  p.line(lr('TOTAL NET:', `${total.toFixed(2)} €`, Math.floor(cols / 2)))
   p.size(0, 0).bold(false).rule(cols)
 
   const pays = meta.payments ?? []
   for (const pay of pays) {
     const label = pay.method === 'cash' ? 'ESPECES' : 'CARTE'
-    p.line(`* ${label.padEnd(9)}: ${pay.amount.toFixed(2)} DH${kindNote(pay.kind)}`)
+    p.line(`* ${label.padEnd(9)}: ${pay.amount.toFixed(2)} €${kindNote(pay.kind)}`)
   }
   if (meta.cashier) p.line(`* ${'CAISSIER'.padEnd(9)}: ${meta.cashier.toUpperCase()}`)
   p.line(`* ${'N° TICKET'.padEnd(9)}: ${nextBillNo()}`)
@@ -221,7 +221,7 @@ export function buildFriendStatement(d: FriendStatementData, cols = 42): Uint8Ar
   p.align('left').rule(cols)
 
   for (const l of d.lines) {
-    p.line(lr(l.date, `${l.amount.toFixed(2)} DH`, cols))
+    p.line(lr(l.date, `${l.amount.toFixed(2)} €`, cols))
     if (l.detail) {
       // wrap the meal detail under the date so long orders stay readable
       const detail = l.detail.length > cols - 2 ? l.detail.slice(0, cols - 3) + '…' : l.detail
@@ -232,7 +232,7 @@ export function buildFriendStatement(d: FriendStatementData, cols = 42): Uint8Ar
   p.rule(cols)
 
   p.bold(true).size(1, 1)
-  p.line(lr('TOTAL DU:', `${d.total.toFixed(2)} DH`, Math.floor(cols / 2)))
+  p.line(lr('TOTAL DU:', `${d.total.toFixed(2)} €`, Math.floor(cols / 2)))
   p.size(0, 0).bold(false).rule(cols)
   p.line(`* ${'CAISSIER'.padEnd(9)}: ${d.cashier.toUpperCase()}`)
   p.line(`* ${'EDITE LE'.padEnd(9)}: ${stamp()}`)
@@ -259,7 +259,7 @@ function printFriendStatementHtml(d: FriendStatementData) {
   const rows = d.lines
     .map(
       (l) => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:600">
-        <span>${esc(l.date)}</span><span>${l.amount.toFixed(2)} DH</span></div>
+        <span>${esc(l.date)}</span><span>${l.amount.toFixed(2)} €</span></div>
       ${l.detail ? `<div style="font-size:11px;color:#333;padding-left:6px">${esc(l.detail)}</div>` : ''}`,
     )
     .join('')
@@ -272,7 +272,7 @@ function printFriendStatementHtml(d: FriendStatementData) {
     <hr style="border:none;border-top:1px dashed #000;margin:6px 0" />
     ${rows || '<div style="text-align:center;font-size:12px">(rien à régler)</div>'}
     <hr style="border:none;border-top:1px dashed #000;margin:6px 0" />
-    <div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px"><span>TOTAL DÛ</span><span>${d.total.toFixed(2)} DH</span></div>
+    <div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px"><span>TOTAL DÛ</span><span>${d.total.toFixed(2)} €</span></div>
     <div style="font-size:11px;margin-top:4px">* CAISSIER : ${esc(d.cashier.toUpperCase())}</div>
     <div style="font-size:11px">* ÉDITÉ LE : ${stamp()}</div>
     <div style="text-align:center;font-size:11px;margin-top:8px">${FOOTER.join('<br/>')}</div>`
@@ -381,7 +381,7 @@ export function buildSalesReport(d: SalesReportData, cols = 42): Uint8Array {
         p.line(lr(o.date, o.amount.toFixed(2), cols))
         if (o.items) p.line(`  ${o.items}`)
       }
-      p.bold(true).line(lr('  Total:', `${g.total.toFixed(2)} DH`, cols)).bold(false)
+      p.bold(true).line(lr('  Total:', `${g.total.toFixed(2)} €`, cols)).bold(false)
       p.feed(1)
     }
     if (d.groups.length === 0) p.align('center').line('(aucune vente)').align('left')
@@ -396,15 +396,15 @@ export function buildSalesReport(d: SalesReportData, cols = 42): Uint8Array {
   p.bold(true)
   p.line(lr('PLATS VENDUS:', String(d.totalQty), cols))
   if (d.sodasQty !== undefined) p.line(lr('SODAS:', String(d.sodasQty), cols))
-  p.size(0, 1).line(lr('TOTAL VENTES:', `${d.totalRev.toFixed(2)} DH`, cols)).size(0, 0)
+  p.size(0, 1).line(lr('TOTAL VENTES:', `${d.totalRev.toFixed(2)} €`, cols)).size(0, 0)
   p.bold(false).rule(cols)
 
   p.bold(true).line('ENCAISSEMENTS').bold(false)
-  p.line(`* ${'ESPECES'.padEnd(9)}: ${d.cash.toFixed(2)} DH`)
-  p.line(`* ${'CARTE'.padEnd(9)}: ${d.card.toFixed(2)} DH`)
+  p.line(`* ${'ESPECES'.padEnd(9)}: ${d.cash.toFixed(2)} €`)
+  p.line(`* ${'CARTE'.padEnd(9)}: ${d.card.toFixed(2)} €`)
   if (d.friendSettlements)
-    p.line(`* ${'DONT AMIS'.padEnd(9)}: ${d.friendSettlements.toFixed(2)} DH`)
-  p.bold(true).line(`* ${'TOTAL'.padEnd(9)}: ${(d.cash + d.card).toFixed(2)} DH`).bold(false)
+    p.line(`* ${'DONT AMIS'.padEnd(9)}: ${d.friendSettlements.toFixed(2)} €`)
+  p.bold(true).line(`* ${'TOTAL'.padEnd(9)}: ${(d.cash + d.card).toFixed(2)} €`).bold(false)
   p.rule(cols)
 
   p.line(`* ${'CAISSIER'.padEnd(9)}: ${d.cashier.toUpperCase()}`)
@@ -444,7 +444,7 @@ function printSalesReportHtml(d: SalesReportData) {
           const cmd = g.count === 1 ? '1 commande' : `${g.count} commandes`
           return `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:12.5px;margin-top:8px;border-bottom:1px solid #000"><span>${esc(g.name)}</span><span>${cmd}</span></div>
           ${g.orders.map(orderRow).join('')}
-          <div style="display:flex;justify-content:space-between;font-weight:700;font-size:12px;margin-top:2px"><span>Total</span><span>${g.total.toFixed(2)} DH</span></div>`
+          <div style="display:flex;justify-content:space-between;font-weight:700;font-size:12px;margin-top:2px"><span>Total</span><span>${g.total.toFixed(2)} €</span></div>`
         })
         .join('')
     : d.lines.map(itemRow).join('')
@@ -460,12 +460,12 @@ function printSalesReportHtml(d: SalesReportData) {
     <hr style="border:none;border-top:1px dashed #000;margin:6px 0" />
     <div style="display:flex;justify-content:space-between;font-size:12px"><span>PLATS VENDUS</span><span>${d.totalQty}</span></div>
     ${d.sodasQty !== undefined ? `<div style="display:flex;justify-content:space-between;font-size:12px"><span>SODAS</span><span>${d.sodasQty}</span></div>` : ''}
-    <div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px"><span>TOTAL VENTES</span><span>${d.totalRev.toFixed(2)} DH</span></div>
+    <div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px"><span>TOTAL VENTES</span><span>${d.totalRev.toFixed(2)} €</span></div>
     <hr style="border:none;border-top:1px dashed #000;margin:6px 0" />
-    <div style="font-size:11px">* ESPÈCES : ${d.cash.toFixed(2)} DH</div>
-    <div style="font-size:11px">* CARTE : ${d.card.toFixed(2)} DH</div>
-    ${d.friendSettlements ? `<div style="font-size:11px;color:#333">&nbsp;&nbsp;dont amis : ${d.friendSettlements.toFixed(2)} DH</div>` : ''}
-    <div style="font-size:11px;font-weight:700">* TOTAL : ${(d.cash + d.card).toFixed(2)} DH</div>
+    <div style="font-size:11px">* ESPÈCES : ${d.cash.toFixed(2)} €</div>
+    <div style="font-size:11px">* CARTE : ${d.card.toFixed(2)} €</div>
+    ${d.friendSettlements ? `<div style="font-size:11px;color:#333">&nbsp;&nbsp;dont amis : ${d.friendSettlements.toFixed(2)} €</div>` : ''}
+    <div style="font-size:11px;font-weight:700">* TOTAL : ${(d.cash + d.card).toFixed(2)} €</div>
     <div style="font-size:11px;margin-top:4px">* CAISSIER : ${esc(d.cashier.toUpperCase())}</div>
     <div style="font-size:11px">* ÉDITÉ LE : ${stamp()}</div>
     <div style="text-align:center;font-size:11px;margin-top:8px">${FOOTER.join('<br/>')}</div>`
@@ -484,11 +484,23 @@ function printSalesReportHtml(d: SalesReportData) {
  * ------------------------------------------------------------------ */
 
 /**
- * Print a customer bill. In the Caisse desktop app it goes straight to the
- * cashier printer, which is USB-cabled to the till PC (Windows spooler, no
- * network/IP involved). Anywhere else (a browser, e.g. the admin "view
- * bill" action) it falls back to the OS print dialog so the feature still
- * works off the till.
+ * Which till's printer a bill comes out of. Both are Windows-installed
+ * printers reached through the spooler — 'cashier' is the one cabled to the
+ * main till, 'bar' the one cabled to the bar's till.
+ */
+export type BillStation = 'cashier' | 'bar'
+
+/**
+ * Print a customer bill. In the Caisse desktop app it goes straight to a
+ * printer installed in Windows (the spooler — no network/IP involved).
+ * Anywhere else (a browser, e.g. the admin "view bill" action) it falls back
+ * to the OS print dialog so the feature still works off the till.
+ *
+ * `station` picks WHICH printer. Tables on the BAR floor print their
+ * addition on the bar's own printer, so the barman hands the customer their
+ * bill without walking to the main till; everything else prints at the
+ * caisse. A bar bill falls back to the cashier printer when no bar printer
+ * has been configured, so the bill is never simply lost.
  */
 /** Print the customer bill. Returns the number of unsent items that were
  * stripped (0 when everything was sent to the kitchen). */
@@ -496,11 +508,13 @@ export async function printBill(
   tableRef: string,
   items: OrderItem[],
   meta: BillMeta = {},
+  station: BillStation = 'cashier',
 ): Promise<number> {
   const stripped = items.filter((i) => !sentToKitchen(i) && !i.voided).length
-  const { cashierPrinterName, paperWidth } = usePrinter.getState()
-  if (inTauri() && cashierPrinterName) {
-    await printEscPosUsb(cashierPrinterName, buildBill(tableRef, items, meta, columnsFor(paperWidth)))
+  const { cashierPrinterName, barPrinterName, paperWidth } = usePrinter.getState()
+  const target = station === 'bar' ? barPrinterName || cashierPrinterName : cashierPrinterName
+  if (inTauri() && target) {
+    await printEscPosUsb(target, buildBill(tableRef, items, meta, columnsFor(paperWidth)))
     return stripped
   }
   printBillHtml(tableRef, items, meta)
@@ -526,14 +540,14 @@ function printBillHtml(tableRef: string, rawItems: OrderItem[], meta: BillMeta) 
   body += `<hr style="border:none;border-top:1px dashed #000;margin:6px 0" />`
   if (discount > 0) {
     body += `<div style="display:flex;justify-content:space-between;font-size:12px">
-      <span>SOUS-TOTAL</span><span>${gross.toFixed(2)} DH</span></div>
+      <span>SOUS-TOTAL</span><span>${gross.toFixed(2)} €</span></div>
       <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700">
-      <span>REMISE -${discount}%</span><span>-${(gross - total).toFixed(2)} DH</span></div>`
+      <span>REMISE -${discount}%</span><span>-${(gross - total).toFixed(2)} €</span></div>`
   }
   body += `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px">
-    <span>TOTAL NET</span><span>${total.toFixed(2)} DH</span></div>`
+    <span>TOTAL NET</span><span>${total.toFixed(2)} €</span></div>`
   for (const pay of meta.payments ?? []) {
-    body += `<div style="font-size:11px">* ${pay.method === 'cash' ? 'ESPECES' : 'CARTE'} : ${pay.amount.toFixed(2)} DH${esc(kindNote(pay.kind))}</div>`
+    body += `<div style="font-size:11px">* ${pay.method === 'cash' ? 'ESPECES' : 'CARTE'} : ${pay.amount.toFixed(2)} €${esc(kindNote(pay.kind))}</div>`
   }
   if (meta.cashier) body += `<div style="font-size:11px">* CAISSIER : ${esc(meta.cashier.toUpperCase())}</div>`
   body += `<div style="font-size:11px">* TABLE : ${esc(tableRef)}</div>

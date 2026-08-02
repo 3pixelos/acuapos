@@ -22,6 +22,7 @@ import { clock, money } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import type { MenuCategory, MenuItem as MenuItemT, MenuMain, OrderItem, TableSession } from '../lib/types'
 import {
+  catName,
   DRINK_INCLUDED_CATEGORIES,
   NO_INCLUDED_DRINK_ITEMS,
   INCLUDED_DRINK_CATEGORY,
@@ -417,7 +418,7 @@ export function OrderDrawer({
                     : 'border-line bg-surface text-ink-2'
                 }`}
               >
-                {lang === 'fr' ? c.name_fr : c.name_en}
+                {catName(c, lang)}
               </button>
             ))}
           </div>
@@ -574,6 +575,8 @@ export function OrderDrawer({
                             : 'border-line-2 bg-surface-2'
                         }`}
                       >
+                        {/* included drinks carry only [fr, en] labels; a
+                            Spanish till reads the English one */}
                         {lang === 'fr' ? fr : en}
                         {picked > 0 && (
                           <span className="tnum absolute -top-1.5 -right-1.5 grid size-6 place-items-center rounded-full bg-stone-900 text-[12px] font-extrabold text-white shadow-(--shadow-1)">
@@ -637,7 +640,7 @@ export function OrderDrawer({
                   }`}
                 >
                   <span className="text-[16px]">{n}</span>
-                  <span className="tnum text-[11px] opacity-80">{eggPrice(n)} DH</span>
+                  <span className="tnum text-[11px] opacity-80">{eggPrice(n)} €</span>
                 </button>
               ))}
             </div>
@@ -673,7 +676,7 @@ export function OrderDrawer({
               setEggPrep('')
             }}
           >
-            {t('confirm')} · {eggPrice(eggCount)} DH
+            {t('confirm')} · {eggPrice(eggCount)} €
           </Btn>
         </Modal>
       )}

@@ -1,8 +1,9 @@
+/** Money, Spanish/European convention: "1.234,50 €". */
 export const money = (n: number) =>
-  Number(n || 0).toLocaleString('fr-MA', {
+  Number(n || 0).toLocaleString('es-ES', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }) + ' DH'
+  }) + ' €'
 
 /** Compact duration: "45 s", "12 min", "1 h 05". */
 export function dur(ms: number) {
@@ -14,10 +15,12 @@ export function dur(ms: number) {
 }
 
 export const clock = (t: string | number) =>
-  new Date(t).toLocaleTimeString('fr-MA', { hour: '2-digit', minute: '2-digit' })
+  new Date(t).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+
+const DATE_LOCALE: Record<string, string> = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES' }
 
 export const dateLabel = (t: string | number, lang: string) =>
-  new Date(t).toLocaleDateString(lang === 'fr' ? 'fr-MA' : 'en-GB', {
+  new Date(t).toLocaleDateString(DATE_LOCALE[lang] ?? 'es-ES', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',

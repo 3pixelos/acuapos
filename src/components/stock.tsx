@@ -6,7 +6,7 @@ import { setItemAvailability, setItemPrice } from '../state/actions'
 import { money } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import type { Branch, MenuItem as MenuItemT, MenuMain } from '../lib/types'
-import { isAvailable, MENU_MAINS } from '../lib/types'
+import { catName, isAvailable, MENU_MAINS } from '../lib/types'
 
 /**
  * Availability ("rupture de stock") manager, shared by the caisse and the
@@ -95,7 +95,7 @@ export function AvailabilityManager({ branch }: { branch?: Branch }) {
                       : 'border-line bg-surface text-ink-2'
                   }`}
                 >
-                  {lang === 'fr' ? c.name_fr : c.name_en}
+                  {catName(c, lang)}
                   {outIn([c.id]) > 0 && <span className="ml-1.5 font-bold text-red-300">•</span>}
                 </button>
               ))}
@@ -160,7 +160,9 @@ function PriceInput({ item, staffId }: { item: MenuItemT; staffId: string }) {
 
   const commit = () => {
     setEditing(false)
-    const n = Math.max(0, Math.round(Number(draft.replace(',', '.'))))
+    // Euro prices carry cents (9,95) — rounding to a whole unit here, as the
+    // dirham build did, would silently turn 9,95 into 10.
+    const n = Math.max(0, Math.round(Number(draft.replace(',', '.')) * 100) / 100)
     if (!Number.isFinite(n) || n === item.price) return setDraft(String(item.price))
     void setItemPrice(item, n, staffId)
   }
@@ -169,7 +171,7 @@ function PriceInput({ item, staffId }: { item: MenuItemT; staffId: string }) {
     <span className="inline-flex shrink-0 items-center gap-1">
       <input
         value={draft}
-        inputMode="numeric"
+        inputMode="decimal"
         onFocus={() => setEditing(true)}
         onChange={(e) => setDraft(e.target.value.replace(/[^\d.,]/g, ''))}
         onBlur={commit}
@@ -184,7 +186,7 @@ function PriceInput({ item, staffId }: { item: MenuItemT; staffId: string }) {
         aria-label={`Prix ${item.name}`}
         className="tnum h-9 w-16 rounded-lg border border-line-2 bg-surface-2 px-2 text-right text-[14px] font-bold outline-none focus:border-accent"
       />
-      <span className="text-[12px] font-semibold text-ink-3">DH</span>
+      <span className="text-[12px] font-semibold text-ink-3">€</span>
     </span>
   )
 }

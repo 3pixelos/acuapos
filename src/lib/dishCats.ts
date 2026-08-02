@@ -5,11 +5,12 @@
  */
 
 /** Category `main` groups that are real food (a "plat"). */
-export const FOOD_MAINS = ['breakfast', 'lunch', 'steaks', 'sweets']
-/** Food-ish categories that are add-ons, not standalone plats. */
-export const EXTRA_CATS_FR = ['Extras', 'Extras Breakfast']
+export const FOOD_MAINS = ['food']
+/** Food-ish categories that are add-ons, not standalone plats. Matched on
+ * the category's French name, which is what an order line stores. */
+export const EXTRA_CATS_FR = ['Extras et accompagnements']
 /** Sodas are counted on their own (high volume). */
-export const SODA_CAT_FR = 'Sodas'
+export const SODA_CAT_FR = 'Boissons fraîches'
 
 export type DishKind = 'plat' | 'soda' | 'other'
 

@@ -2,6 +2,22 @@ plugins {
     id 'com.android.application'
 }
 
+// Release signing. The keystore is NEVER committed (see android/.gitignore):
+// its location and passwords come from android/keystore.properties locally,
+// or from environment variables in CI. With neither present the release build
+// simply comes out unsigned — that still compiles, it just can't be installed,
+// which is the honest outcome rather than a silent debug-signed "release".
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+def storeFilePath = keystoreProps['storeFile'] ?: System.getenv('ACUA_KEYSTORE_FILE')
+def storePw = keystoreProps['storePassword'] ?: System.getenv('ACUA_KEYSTORE_PASSWORD')
+def keyAliasName = keystoreProps['keyAlias'] ?: System.getenv('ACUA_KEY_ALIAS')
+def keyPw = keystoreProps['keyPassword'] ?: System.getenv('ACUA_KEY_PASSWORD')
+def canSign = storeFilePath && rootProject.file(storeFilePath).exists()
+
 android {
     namespace 'com.acua.pos'
     compileSdk 34
@@ -17,10 +33,22 @@ android {
         versionName "1.0"
     }
 
+    if (canSign) {
+        signingConfigs {
+            release {
+                storeFile rootProject.file(storeFilePath)
+                storePassword storePw
+                keyAlias keyAliasName
+                keyPassword keyPw
+            }
+        }
+    }
+
     buildTypes {
         release {
             // No shrinking: the app is a single Activity, nothing to gain.
             minifyEnabled false
+            if (canSign) signingConfig signingConfigs.release
         }
     }
 

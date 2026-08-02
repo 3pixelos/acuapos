@@ -19,7 +19,7 @@ A restaurant floor + order + billing + analytics system with three distinct inte
 - **Admin** — responsive (phone + desktop), used by ownership/management
 - **Kitchen print station** — a fixed unattended screen next to the kitchen printer; not logged into by a person, just left open
 
-Bilingual throughout (French / English), with instant language switching.
+Trilingual throughout (French / English / Spanish), with instant language switching.
 
 ## 2. Tech stack
 
@@ -93,12 +93,12 @@ Key modeling decisions:
 ## 5. Cross-cutting requirements actually implemented
 
 - **Real-time sync** across every open device (Supabase Realtime) — no manual refresh anywhere
-- **Bilingual FR/EN** on every string, instant switching (no reload, no stale UI)
+- **Trilingual FR/EN/ES** on every string, instant switching (no reload, no stale UI)
 - **Automatic time-based status escalation** (preparing → late at 30 min) computed live, not polled
 - Full **audit logging** of every state-changing action with actor, reason (where applicable), and timestamp
 - Mobile-first responsive design tuned for one-handed phone use (waiter) vs. desktop-dense layouts (cashier), with admin covering both
 - Receipt-ratio thermal printing (not browser-default page printing) for both kitchen tickets and bills
-- Currency/locale formatting (MAD/DH, French number formatting)
+- Currency/locale formatting (EUR, Spanish/European number formatting)
 
 ## 6. What this is *not* (useful for scoping/pricing boundaries)
 

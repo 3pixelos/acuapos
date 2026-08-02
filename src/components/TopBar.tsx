@@ -4,7 +4,7 @@ import { useAuth } from '../state/auth'
 import { PoweredBy } from './PoweredBy'
 import { AcuaLogo } from './AcuaLogo'
 import { useData } from '../state/data'
-import { useI18n } from '../lib/i18n'
+import { LANG_LABEL, LANG_SHORT, nextLang, useI18n } from '../lib/i18n'
 
 export interface NavTab {
   id: string
@@ -53,12 +53,12 @@ export function TopBar({
 
           <div className="hidden items-center gap-2 sm:flex">
             <button
-              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+              onClick={() => setLang(nextLang(lang))}
               className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-bold text-ink-2 transition-colors hover:bg-surface-2"
               aria-label="Language"
             >
               <Languages size={14} />
-              {lang === 'fr' ? 'FR' : 'EN'}
+              {LANG_SHORT[lang]}
             </button>
             {user && (
               <div className="text-right leading-tight">
@@ -157,11 +157,11 @@ function Sidebar({
 
         <div className="mt-auto flex flex-col gap-2 px-5 py-4">
           <button
-            onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+            onClick={() => setLang(nextLang(lang))}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line text-sm font-bold text-ink-2"
           >
             <Languages size={15} />
-            {lang === 'fr' ? 'Français' : 'English'}
+            {LANG_LABEL[lang]}
           </button>
           <button
             onClick={logout}
