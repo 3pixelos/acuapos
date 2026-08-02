@@ -5,12 +5,14 @@ name: Build Android APK
 # when the SHELL changes (icon, name, URL) — pushing a new web build to
 # Vercel reaches every phone on the next app open, no reinstall.
 #
-# Runs on an android-v* tag (attaches the APK to a GitHub Release) and can be
-# started by hand from the Actions tab.
+# MANUAL ONLY, on purpose. It used to also fire on an android-v* tag, but
+# publishing a Release creates that tag — so cutting a release of an APK built
+# elsewhere tripped this workflow, which then failed on the missing signing
+# secrets and left a red X against a perfectly good commit. Signing material
+# lives on the developer's machine, not in the repo, so this can only succeed
+# once the ANDROID_KEYSTORE_* secrets are set; until then it should run only
+# when somebody deliberately asks for it.
 on:
-  push:
-    tags:
-      - "android-v*"
   workflow_dispatch:
 
 permissions:
@@ -67,10 +69,6 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-      - name: Attach to release (tag builds only)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: android/app/build/outputs/apk/release/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # No release step: this workflow is manual-only now, so there is never a
+      # tag to attach to. Download the APK from the run's Artifacts, or upload
+      # it to a Release by hand.
