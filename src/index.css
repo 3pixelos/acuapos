@@ -47,7 +47,10 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
+  /* Both axes. iOS largely suppresses horizontal rubber-banding on its own,
+   * but Android's WebView does not — so on the waiters' phones the floor
+   * could be dragged sideways into empty space. */
+  overscroll-behavior: none;
 }
 
 button {

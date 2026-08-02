@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Acua's pale-blue field, same as the wordmark's backdrop everywhere else. -->
+    <color name="ic_launcher_background">#e8eef4</color>
+</resources>

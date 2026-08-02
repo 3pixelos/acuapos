@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
-import type { Branch, LayerId, TableStatus } from '../lib/types'
-import { BRANCH_LAYERS } from '../lib/types'
+import type { Branch, LayerId, Role, TableStatus } from '../lib/types'
+import { layersForRole } from '../lib/types'
 import { useI18n, type TKey } from '../lib/i18n'
 
 export const LAYER_TKEY: Record<LayerId, TKey> = {
@@ -12,28 +12,36 @@ export const LAYER_TKEY: Record<LayerId, TKey> = {
   emporter: 'layer_emporter',
 }
 
-/** Rooms available at the location, as switcher entries. */
-export const layersFor = (branch: Branch): { id: LayerId; tkey: TKey }[] =>
-  BRANCH_LAYERS[branch].map((id) => ({ id, tkey: LAYER_TKEY[id] }))
+/** Rooms a role may switch between, as switcher entries. */
+export const layersFor = (branch: Branch, role: Role): { id: LayerId; tkey: TKey }[] =>
+  layersForRole(branch, role).map((id) => ({ id, tkey: LAYER_TKEY[id] }))
 
 export function LayerSwitcher({
   layer,
   setLayer,
   /** Which location's rooms to offer. */
   branch = 'main',
+  /** Whose room list to show — waiters don't get À emporter. */
+  role,
 }: {
   layer: LayerId
   setLayer: (l: LayerId) => void
   branch?: Branch
+  role: Role
 }) {
   const t = useI18n((s) => s.t)
   return (
     <div className="flex rounded-full bg-surface-2 p-1">
-      {layersFor(branch).map((l) => (
+      {layersFor(branch, role).map((l) => (
         <button
           key={l.id}
           onClick={() => setLayer(l.id)}
-          className={`min-h-9 flex-1 rounded-full px-3 text-[13px] font-semibold whitespace-nowrap transition-all sm:flex-none sm:px-4 ${
+          // `min-w-0` + `truncate` let a pill shrink below its label. Without
+          // them a flex child refuses to go under its content width, so on a
+          // phone the row grew wider than the screen and dragged the whole
+          // page sideways with it — five rooms already overflow a 375px
+          // screen in every language.
+          className={`min-h-9 min-w-0 flex-1 truncate rounded-full px-2 text-[13px] font-semibold transition-all sm:flex-none sm:px-4 ${
             layer === l.id ? 'bg-surface text-ink shadow-(--shadow-1)' : 'text-ink-3'
           }`}
         >

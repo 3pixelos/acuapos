@@ -334,7 +334,7 @@ function LiveMap({ branch }: { branch: BranchScope }) {
 
   return (
     <div className="flex h-full min-h-120 flex-col gap-3">
-      <LayerSwitcher layer={layer} setLayer={setLayer} branch={shown} />
+      <LayerSwitcher layer={layer} setLayer={setLayer} branch={shown} role="admin" />
       <Legend />
       <FloorMap
         views={views}

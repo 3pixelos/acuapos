@@ -1,0 +1,28 @@
+<!--
+  Adaptive-icon FOREGROUND (Android 8.0+). Transparent background — the
+  background layer is the flat brand colour in values/ic_launcher_background.xml.
+
+  Android crops an adaptive icon to whatever shape the launcher wants (circle,
+  squircle, rounded square) and only the central 66% is guaranteed to survive.
+  A four-letter wordmark is wide and short, so what has to fit is its
+  CORNERS, not its width: the safe circle has radius 512*(72/108)/2 = 170.7,
+  and the glyph box is 429x181, so the largest safe scale is
+  170.7 / hypot(429/2, 181/2) = 0.733. Fitting the width to the circle's
+  DIAMETER instead (0.78) pushed the outer A's outside the circle and a
+  round-mask launcher shaved them.
+
+  It looks smaller than the legacy icon on purpose — this is the size that is
+  never clipped, on any launcher.
+
+  Glyph centre is x=268, not 256.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g transform="translate(256 256) scale(0.73) translate(-268 -256)">
+    <g fill="none" stroke="#22b3c6" stroke-width="21" stroke-linecap="butt" stroke-linejoin="miter">
+      <path d="M64 336 L104 176 L144 336 M78 282 L130 282"/>
+      <path d="M250 200 A68 78 0 1 0 250 312" stroke-linecap="round"/>
+      <path d="M282 176 L282 292 A43 43 0 0 0 368 292 L368 176" stroke-linecap="round"/>
+      <path d="M392 336 L432 176 L472 336 M406 282 L458 282"/>
+    </g>
+  </g>
+</svg>

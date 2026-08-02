@@ -60,7 +60,7 @@ import { money } from '../lib/format'
 import { todayKey } from '../lib/serviceDay'
 import { useI18n } from '../lib/i18n'
 import type { Friend, FriendDebt, LayerId, TableSession } from '../lib/types'
-import { BAR_LAYER, BRANCH_LAYERS, labelsFor, visualStatus } from '../lib/types'
+import { BAR_LAYER, labelsFor, layersForRole, visualStatus } from '../lib/types'
 
 export function CaisseHome() {
   const user = useAuth((s) => s.user)!
@@ -68,7 +68,7 @@ export function CaisseHome() {
   const now = useNow()
   const t = useI18n((s) => s.t)
   // First room of the location.
-  const [layer, setLayer] = useState<LayerId>(BRANCH_LAYERS[user.branch][0])
+  const [layer, setLayer] = useState<LayerId>(layersForRole(user.branch, user.role)[0])
   const [openId, setOpenId] = useState<string | null>(null)
   const [orderId, setOrderId] = useState<string | null>(null)
   const [seatFor, setSeatFor] = useState<string[] | null>(null)
@@ -160,7 +160,7 @@ export function CaisseHome() {
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <LayerSwitcher layer={layer} setLayer={setLayer} branch={user.branch} />
+            <LayerSwitcher layer={layer} setLayer={setLayer} branch={user.branch} role={user.role} />
             {/* the "Amis" tab: switches the floor for the friends' tabs */}
             <button
               onClick={() => setFriendsView((v) => !v)}
@@ -1312,7 +1312,8 @@ function TablePicker({
   // Default to the source table's own layer, not just whichever table
   // happens to sort first in the full list.
   const [layer, setLayer] = useState<LayerId>(
-    (tables.find((tb) => tb.id === sourceTableId)?.layer ?? BRANCH_LAYERS[branch][0]) as LayerId,
+    (tables.find((tb) => tb.id === sourceTableId)?.layer ??
+      layersForRole(branch, 'cashier')[0]) as LayerId,
   )
   const shown = tables
     .filter((tb) => tb.layer === layer && !excludeIds.includes(tb.id))
@@ -1328,7 +1329,7 @@ function TablePicker({
     <Modal onClose={onClose}>
       <h2 className="text-lg font-bold">{t('chooseTable')}</h2>
       <div className="mt-3">
-        <LayerSwitcher layer={layer} setLayer={setLayer} branch={branch} />
+        <LayerSwitcher layer={layer} setLayer={setLayer} branch={branch} role="cashier" />
       </div>
       <div className="mt-4 grid max-h-[50vh] grid-cols-4 gap-2 overflow-y-auto">
         {shown.map((tb) => {

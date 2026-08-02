@@ -9,7 +9,7 @@ import { useData } from '../state/data'
 import { joinTablesMulti, seatTable } from '../state/actions'
 import { useI18n } from '../lib/i18n'
 import type { LayerId, TableSession } from '../lib/types'
-import { BRANCH_LAYERS, labelsFor } from '../lib/types'
+import { labelsFor, layersForRole } from '../lib/types'
 
 export function WaiterHome() {
   const user = useAuth((s) => s.user)!
@@ -17,7 +17,7 @@ export function WaiterHome() {
   const now = useNow()
   const t = useI18n((s) => s.t)
   // First room of the location.
-  const [layer, setLayer] = useState<LayerId>(BRANCH_LAYERS[user.branch][0])
+  const [layer, setLayer] = useState<LayerId>(layersForRole(user.branch, user.role)[0])
 
   const views = useMemo(
     () =>
@@ -100,7 +100,7 @@ export function WaiterHome() {
     <div className="flex min-h-dvh flex-col">
       <TopBar section={t('roomMap')} />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-4 py-4">
-        <LayerSwitcher layer={layer} setLayer={setLayer} branch={user.branch} />
+        <LayerSwitcher layer={layer} setLayer={setLayer} branch={user.branch} role={user.role} />
         <div className="flex items-center justify-between gap-3">
           <Legend />
           {/* button alternative to the long-press — same join mode */}

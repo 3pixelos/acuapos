@@ -75,7 +75,11 @@ Same SQL Editor → paste
 
 Loads the 16 menu categories (8 kitchen + 8 bar) and 85 items with their euro
 prices, plus the real floor: **Front Door** (3), **Salon** (20), **Terrace**
-(20), **Bar** (2) and **À emporter** (3). Re-running rebuilds both to exactly
+(20), **Bar** (2) and **À emporter** (3).
+
+**À emporter is the caisse's, not the waiters'** — a to-go order is rung up at
+the till, never carried to a table, so waiters don't see that room at all
+(`layersForRole` in `src/lib/types.ts`). Re-running rebuilds both to exactly
 that state — it refuses to run while any table is still open.
 
 Menu routing lives in `menu_categories.main`: **`food` prints in the kitchen,

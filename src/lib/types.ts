@@ -42,6 +42,23 @@ export const BRANCH_LAYERS: Record<Branch, LayerId[]> = {
  * one — the barman settles their own floor without walking to the till. */
 export const BAR_LAYER: LayerId = 'bar'
 
+/** Takeaway isn't a room anyone waits on — an order to go is rung up at the
+ * till, never carried to a table. Waiters don't see it. */
+const CAISSE_ONLY_LAYERS: LayerId[] = ['emporter']
+
+/**
+ * The rooms a given role may switch between. Waiters get the real floor;
+ * the caisse and admins also get À emporter.
+ *
+ * This is the ONE place the rule lives, so the floor map, the layer
+ * switcher and the transfer-table picker can't drift apart and offer a
+ * waiter a room the map won't render.
+ */
+export function layersForRole(branch: Branch, role: Role): LayerId[] {
+  const all = BRANCH_LAYERS[branch]
+  return role === 'waiter' ? all.filter((l) => !CAISSE_ONLY_LAYERS.includes(l)) : all
+}
+
 export interface RestaurantTable {
   id: string
   label: string
