@@ -5,10 +5,10 @@ import { BRANCH_LAYERS } from '../lib/types'
 import { useI18n, type TKey } from '../lib/i18n'
 
 export const LAYER_TKEY: Record<LayerId, TKey> = {
-  terrasse: 'layer_terrasse',
-  vipsalon: 'layer_vipsalon',
+  frontdoor: 'layer_frontdoor',
   salon: 'layer_salon',
-  etage2: 'layer_etage2',
+  terrasse: 'layer_terrasse',
+  bar: 'layer_bar',
   emporter: 'layer_emporter',
 }
 

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { supabase } from './supabase'
 import { buildKitchenTicket } from './print'
-import { inTauri, printEscPos } from './tauri'
+import { inTauri, printEscPos, printEscPosUsb } from './tauri'
 import { usePrinter, columnsFor } from '../state/printer'
 import { deviceBranch } from '../state/auth'
 import { BAR_ROUTED_ITEM_NAMES, INCLUDED_DRINK_CATEGORY, type OrderItem } from './types'
@@ -10,23 +10,65 @@ import { BAR_ROUTED_ITEM_NAMES, INCLUDED_DRINK_CATEGORY, type OrderItem } from '
  * The silent ticket-print backbone. Runs only inside the Caisse desktop
  * (Tauri) app, mounted once at the app root — not a screen, not a route,
  * nothing anyone opens. It watches order_items for sent-but-unprinted
- * tickets and streams each to the right printer over TCP.
+ * tickets and streams each to the right printer.
  *
- * Three stations: every ticket is split by the item's MAIN category —
- * drinks go to the BAR printer, desserts to the SWEETS printer, and
- * everything else (breakfast / lunch / steaks) to the KITCHEN printer,
- * each as its own receipt. The caisse bill is untouched; the split only
- * exists at ordering time. If a station has no IP configured it falls back
- * to a sensible neighbour (sweets -> bar -> kitchen), so nothing queues
- * forever on a printer that isn't set up yet.
+ * Two stations: every ticket is split by the item's MAIN category — drinks
+ * go to the BAR printer, everything else to the KITCHEN printer, each as
+ * its own receipt. The caisse bill is untouched; the split only exists at
+ * ordering time.
+ *
+ * The two stations are reached DIFFERENTLY. The kitchen printer is the only
+ * one on the network (raw TCP :9100). The bar printer is cabled to the bar's
+ * own till, so it is addressed by its Windows printer NAME through the
+ * spooler — the same route the cashier printer uses. If no bar printer has
+ * been picked yet, drinks fall back to the kitchen rather than queueing
+ * forever on a station that isn't set up.
  *
  * Each sub-ticket succeeds or fails on its own: rows are marked
- * `printed_at` ONLY after their own socket write is confirmed, so the bar
- * being offline queues the drinks while the food still prints (and vice
- * versa) — everything flushes automatically once the printer is back.
+ * `printed_at` ONLY after their own write is confirmed, so the bar being
+ * offline queues the drinks while the food still prints (and vice versa) —
+ * everything flushes automatically once the printer is back.
  */
 
-type Station = 'kitchen' | 'bar' | 'sweets'
+export type Station = 'kitchen' | 'bar'
+
+/** The printer config a station plan is decided from. */
+export interface StationConfig {
+  kitchenIp: string
+  barPrinterName: string
+  printsKitchen: boolean
+  printsBar: boolean
+}
+
+export interface StationPlan {
+  /** Does this machine take tickets for that station at all? */
+  owns: (s: Station) => boolean
+  /** Owns it AND has somewhere to send it. */
+  canPrint: (s: Station) => boolean
+  /** True on a single-till setup with no bar printer: drinks come out of the
+   * kitchen printer. Never true on a machine that serves only the bar — there
+   * it would push drinks onto a printer this till isn't responsible for. */
+  barFallsBackToKitchen: boolean
+  /** Nothing to do — this machine prints no order tickets. */
+  idle: boolean
+}
+
+/**
+ * Which stations this machine takes off the shared queue, and whether it can
+ * actually print them. Pure, and separated out because it is the one piece of
+ * logic that decides whether the two tills cooperate or fight: a till must
+ * leave the other's tickets completely alone — unprinted AND unstamped.
+ */
+export function planStations(cfg: StationConfig): StationPlan {
+  const { kitchenIp, barPrinterName, printsKitchen, printsBar } = cfg
+  const owns = (s: Station) => (s === 'bar' ? printsBar : printsKitchen)
+  const barFallsBackToKitchen = printsBar && printsKitchen && !barPrinterName && Boolean(kitchenIp)
+  const canPrint = (s: Station) =>
+    s === 'bar'
+      ? printsBar && (Boolean(barPrinterName) || barFallsBackToKitchen)
+      : printsKitchen && Boolean(kitchenIp)
+  return { owns, canPrint, barFallsBackToKitchen, idle: !printsKitchen && !printsBar }
+}
 
 export function useKitchenPrintService() {
   useEffect(() => {
@@ -68,10 +110,8 @@ export function useKitchenPrintService() {
         (it.menu_item_id && mainByMenuItem.get(it.menu_item_id)) ??
         mainByCatName.get(it.category) ??
         ''
-      // drinks -> bar, desserts -> their own sweets printer (falls back to
-      // the bar printer when no sweets IP is set — see ipFor below)
+      // drinks -> bar; food (and anything unclassified) -> kitchen
       if (main === 'drinks') return 'bar'
-      if (main === 'sweets') return 'sweets'
       return 'kitchen'
     }
 
@@ -116,8 +156,8 @@ export function useKitchenPrintService() {
             .eq('table_sessions.cancelled', false)
             .eq('table_sessions.branch', branch)
             .order('created_at')
-          const items = (data ?? []) as unknown as OrderItem[]
-          if (!items.length) {
+          const queue = (data ?? []) as unknown as OrderItem[]
+          if (!queue.length) {
             usePrinter.getState().setQueued(0)
             usePrinter.getState().setKitchenOnline(true)
             usePrinter.getState().setBarOnline(true)
@@ -125,29 +165,45 @@ export function useKitchenPrintService() {
           }
 
           await loadMenuRouting()
+
+          const { kitchenIp, barPrinterName, printsKitchen, printsBar, paperWidth } =
+            usePrinter.getState()
+
+          // STATION OWNERSHIP. Both tills — the main caisse and the bar's —
+          // run this service against the same queue. Each only takes the
+          // stations it was told it serves, and leaves the rest untouched
+          // (not printed, not stamped) for the other machine to collect.
+          // Without this every ticket would print twice, once per till.
+          const plan = planStations({ kitchenIp, barPrinterName, printsKitchen, printsBar })
+          if (plan.idle) break // this machine prints no order tickets at all
+
+          const items = queue.filter((i) => plan.owns(stationOf(i)))
+          if (!items.length) {
+            // Everything queued belongs to the other till. Nothing is wrong
+            // here, so report idle rather than a phantom backlog.
+            usePrinter.getState().setQueued(0)
+            break
+          }
           usePrinter.getState().setQueued(ticketCount(items))
 
-          const { kitchenIp, barIp, sweetsIp, paperWidth } = usePrinter.getState()
-          if (!kitchenIp) {
-            // No printer configured yet — can't print; surface it and stop.
+          // A station this machine owns but has no printer for can't proceed;
+          // surface it and stop rather than spinning.
+          if (printsKitchen && !plan.canPrint('kitchen')) {
             usePrinter.getState().setKitchenOnline(false)
             break
           }
-          const cols = columnsFor(paperWidth)
-          // Fallbacks so nothing queues forever on an un-set printer:
-          // no bar IP -> drinks go to the kitchen; no sweets IP -> desserts
-          // go to the bar (where they printed before this printer existed),
-          // and on to the kitchen if there's no bar either.
-          const barTarget = barIp || kitchenIp
-          const ipFor: Record<Station, string> = {
-            kitchen: kitchenIp,
-            bar: barTarget,
-            sweets: sweetsIp || barTarget,
+          if (printsBar && !plan.canPrint('bar')) {
+            usePrinter.getState().setBarOnline(false)
+            break
           }
-          const headerFor: Record<Station, 'CUISINE' | 'BAR' | 'DESSERTS'> = {
+          const cols = columnsFor(paperWidth)
+          const sendTo = (station: Station, bytes: Uint8Array) =>
+            station === 'bar' && barPrinterName
+              ? printEscPosUsb(barPrinterName, bytes)
+              : printEscPos(kitchenIp, bytes)
+          const headerFor: Record<Station, 'CUISINE' | 'BAR'> = {
             kitchen: 'CUISINE',
             bar: 'BAR',
-            sweets: 'DESSERTS',
           }
 
           // group rows into sub-tickets: session + ticket number + station
@@ -182,7 +238,7 @@ export function useKitchenPrintService() {
           // One station going down must not stop the other: remember which
           // stations failed this pass and skip their remaining sub-tickets
           // (no point stacking 4-second timeouts against a dead printer).
-          const stationDown: Record<Station, boolean> = { kitchen: false, bar: false, sweets: false }
+          const stationDown: Record<Station, boolean> = { kitchen: false, bar: false }
           for (const [key, groupItems] of groups) {
             const [sessionId, ticketNoStr, station] = key.split(':') as [string, string, Station]
             if (stationDown[station]) continue
@@ -197,7 +253,7 @@ export function useKitchenPrintService() {
               station: headerFor[station],
             })
             try {
-              await printEscPos(ipFor[station], bytes)
+              await sendTo(station, bytes)
             } catch (e) {
               console.error(`[${station}-print] failed, leaving ticket queued:`, e)
               stationDown[station] = true
@@ -210,14 +266,18 @@ export function useKitchenPrintService() {
               .in('id', groupItems.map((i) => i.id))
             await new Promise((r) => setTimeout(r, 300)) // let the printer breathe
           }
-          usePrinter.getState().setKitchenOnline(!stationDown.kitchen)
-          // A station with no IP of its own shares the status of whatever
-          // printer it fell back to.
-          usePrinter.getState().setBarOnline(!(barIp ? stationDown.bar : stationDown.kitchen))
+          // A station this machine doesn't serve is reported OK — its badge
+          // is hidden anyway, and "offline" would be a lie about a printer
+          // this till was never asked to reach.
+          usePrinter.getState().setKitchenOnline(!printsKitchen || !stationDown.kitchen)
+          // When the bar falls back to the kitchen printer it shares that
+          // printer's status — that's where its tickets actually went.
           usePrinter
             .getState()
-            .setSweetsOnline(!(sweetsIp ? stationDown.sweets : barIp ? stationDown.bar : stationDown.kitchen))
-          if (stationDown.kitchen || stationDown.bar || stationDown.sweets) break
+            .setBarOnline(
+              !printsBar || !(barPrinterName ? stationDown.bar : stationDown.kitchen),
+            )
+          if (stationDown.kitchen || stationDown.bar) break
         }
       } finally {
         printing = false

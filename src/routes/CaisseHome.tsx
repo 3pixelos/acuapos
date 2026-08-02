@@ -4,6 +4,7 @@ import {
   Package,
   Banknote,
   Calculator,
+  Check,
   CheckCircle2,
   ChefHat,
   CreditCard,
@@ -51,6 +52,7 @@ import {
   sweepStaleWaiting,
   transferItems,
 } from '../state/actions'
+import type { BillStation } from '../lib/print'
 import { printBill, printFriendStatement } from '../lib/print'
 import { inTauri, listPrinters } from '../lib/tauri'
 import { usePrinter, type PaperWidth } from '../state/printer'
@@ -58,7 +60,7 @@ import { money } from '../lib/format'
 import { todayKey } from '../lib/serviceDay'
 import { useI18n } from '../lib/i18n'
 import type { Friend, FriendDebt, LayerId, TableSession } from '../lib/types'
-import { BRANCH_LAYERS, labelsFor, visualStatus } from '../lib/types'
+import { BAR_LAYER, BRANCH_LAYERS, labelsFor, visualStatus } from '../lib/types'
 
 export function CaisseHome() {
   const user = useAuth((s) => s.user)!
@@ -287,7 +289,7 @@ export function CaisseHome() {
 /** Small badge telling the cashier whether kitchen tickets are printing —
  * the only screen anywhere near the kitchen printer. */
 function PrinterStatus() {
-  const { kitchenOnline, barOnline, barIp, sweetsOnline, sweetsIp, queued } = usePrinter()
+  const { kitchenOnline, barOnline, printsKitchen, printsBar, queued } = usePrinter()
   const t = useI18n((s) => s.t)
   if (!inTauri()) return null
   const chip = (ok: boolean, okLabel: string, downLabel: string) => (
@@ -302,20 +304,139 @@ function PrinterStatus() {
   )
   return (
     <span className="inline-flex items-center gap-1.5">
-      {chip(kitchenOnline, t('kitchenPrinterOk'), t('kitchenPrinterOffline'))}
-      {barIp && chip(barOnline, t('barPrinterOk'), t('barPrinterOffline'))}
-      {sweetsIp && chip(sweetsOnline, t('sweetsPrinterOk'), t('sweetsPrinterOffline'))}
+      {/* only the stations THIS till is responsible for — the bar's till has
+          no business showing a kitchen badge, and vice versa */}
+      {printsKitchen && chip(kitchenOnline, t('kitchenPrinterOk'), t('kitchenPrinterOffline'))}
+      {printsBar && chip(barOnline, t('barPrinterOk'), t('barPrinterOffline'))}
     </span>
   )
 }
 
+const PRINTER_FIELD =
+  'min-h-12 w-full rounded-xl border border-line-2 bg-surface-2 px-3.5 outline-none focus:border-accent'
+
+/**
+ * One Windows-printer picker. Both cable-connected printers (the caisse's
+ * and the bar's) are chosen this way — they are addressed by the name
+ * Windows knows them under, never by an IP. Enumeration can fail (or come
+ * back empty on a machine with no printers installed yet), so the control
+ * degrades to a free-text box rather than leaving the cashier stuck.
+ */
+function WindowsPrinterPicker({
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+  printers,
+  listErr,
+  onRefresh,
+}: {
+  label: string
+  hint: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  printers: string[]
+  listErr: string
+  onRefresh: () => void
+}) {
+  const t = useI18n((s) => s.t)
+  return (
+    <label>
+      <span className="mb-1 flex items-center justify-between text-xs font-bold text-ink-2">
+        {label}
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="rounded-full border border-line-2 px-2.5 py-1 text-[11px] font-bold text-ink-2 hover:bg-surface-2"
+        >
+          ↻ {t('refreshList')}
+        </button>
+      </span>
+      <p className="mb-1.5 text-[12px] text-ink-3">{hint}</p>
+      {printers.length > 0 ? (
+        <select className={PRINTER_FIELD} value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          {/* keep a previously saved printer selectable even if it is
+              currently offline / not enumerated */}
+          {value && !printers.includes(value) && <option value={value}>{value}</option>}
+          {printers.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        // list empty or enumeration failed — type the exact Windows name
+        <>
+          <input
+            className={PRINTER_FIELD}
+            value={value}
+            placeholder={placeholder}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <p className="mt-1 text-[12px] font-semibold text-amber-700">
+            {t('printerListEmptyHint')}
+          </p>
+          {listErr && <p className="mt-1 text-[11px] text-danger">{listErr}</p>}
+        </>
+      )}
+    </label>
+  )
+}
+
+/** One station on/off row in the printer settings. */
+function StationToggle({
+  label,
+  hint,
+  on,
+  onChange,
+}: {
+  label: string
+  hint: string
+  on: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
+        on ? 'border-accent bg-accent/5' : 'border-line-2 bg-surface-2'
+      }`}
+    >
+      <span
+        className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-2 ${
+          on ? 'border-accent bg-accent text-white' : 'border-line-2'
+        }`}
+      >
+        {on && <Check size={13} strokeWidth={3} />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13.5px] font-bold">{label}</span>
+        <span className="mt-0.5 block text-[12px] text-ink-3">{hint}</span>
+      </span>
+    </button>
+  )
+}
+
 function PrinterSettings({ onClose }: { onClose: () => void }) {
-  const { kitchenIp, barIp, sweetsIp, cashierPrinterName, paperWidth, setConfig } = usePrinter()
+  const {
+    kitchenIp,
+    barPrinterName,
+    cashierPrinterName,
+    printsKitchen,
+    printsBar,
+    paperWidth,
+    setConfig,
+  } = usePrinter()
   const t = useI18n((s) => s.t)
   const [kip, setKip] = useState(kitchenIp)
-  const [bip, setBip] = useState(barIp)
-  const [sip, setSip] = useState(sweetsIp)
+  const [bname, setBname] = useState(barPrinterName)
   const [cname, setCname] = useState(cashierPrinterName)
+  const [doKitchen, setDoKitchen] = useState(printsKitchen)
+  const [doBar, setDoBar] = useState(printsBar)
   const [pw, setPw] = useState<PaperWidth>(paperWidth)
   const [printers, setPrinters] = useState<string[]>([])
   const [listErr, setListErr] = useState('')
@@ -335,9 +456,6 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(loadPrinters, [])
 
-  const field =
-    'min-h-12 w-full rounded-xl border border-line-2 bg-surface-2 px-3.5 outline-none focus:border-accent'
-
   return (
     <Modal onClose={onClose}>
       <h2 className="flex items-center gap-2 text-lg font-bold">
@@ -345,76 +463,67 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
       </h2>
       <p className="mt-1 text-[13px] text-ink-3">{t('printerSettingsHint')}</p>
       <div className="mt-4 flex flex-col gap-3">
-        <label>
-          <span className="mb-1 block text-xs font-bold text-ink-2">{t('kitchenPrinterIp')}</span>
-          <input
-            className={field}
-            value={kip}
-            inputMode="decimal"
-            placeholder="192.168.1.50"
-            onChange={(e) => setKip(e.target.value.trim())}
-          />
-        </label>
-        <label>
-          <span className="mb-1 block text-xs font-bold text-ink-2">{t('barPrinterIp')}</span>
-          <p className="mb-1.5 text-[12px] text-ink-3">{t('barPrinterIpHint')}</p>
-          <input
-            className={field}
-            value={bip}
-            inputMode="decimal"
-            placeholder="192.168.100.171"
-            onChange={(e) => setBip(e.target.value.trim())}
-          />
-        </label>
-        <label>
-          <span className="mb-1 block text-xs font-bold text-ink-2">{t('sweetsPrinterIp')}</span>
-          <p className="mb-1.5 text-[12px] text-ink-3">{t('sweetsPrinterIpHint')}</p>
-          <input
-            className={field}
-            value={sip}
-            inputMode="decimal"
-            placeholder="192.168.100.172"
-            onChange={(e) => setSip(e.target.value.trim())}
-          />
-        </label>
-        <label>
-          <span className="mb-1 flex items-center justify-between text-xs font-bold text-ink-2">
-            {t('cashierPrinterName')}
-            <button
-              type="button"
-              onClick={loadPrinters}
-              className="rounded-full border border-line-2 px-2.5 py-1 text-[11px] font-bold text-ink-2 hover:bg-surface-2"
-            >
-              ↻ {t('refreshList')}
-            </button>
-          </span>
-          <p className="mb-1.5 text-[12px] text-ink-3">{t('cashierPrinterNameHint')}</p>
-          {printers.length > 0 ? (
-            <select className={field} value={cname} onChange={(e) => setCname(e.target.value)}>
-              <option value="">—</option>
-              {cname && !printers.includes(cname) && <option value={cname}>{cname}</option>}
-              {printers.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            // list empty or enumeration failed — type the exact Windows name
-            <>
-              <input
-                className={field}
-                value={cname}
-                placeholder="POS-80"
-                onChange={(e) => setCname(e.target.value)}
-              />
-              <p className="mt-1 text-[12px] font-semibold text-amber-700">
-                {t('printerListEmptyHint')}
-              </p>
-              {listErr && <p className="mt-1 text-[11px] text-danger">{listErr}</p>}
-            </>
+        {/* Which stations THIS machine prints. The main caisse and the bar's
+            caisse both run this app against the same ticket queue, so each
+            has to take a different half or every ticket prints twice. */}
+        <div>
+          <span className="mb-1 block text-xs font-bold text-ink-2">{t('stationsTitle')}</span>
+          <p className="mb-2 text-[12px] text-ink-3">{t('stationsHint')}</p>
+          <div className="flex flex-col gap-2">
+            <StationToggle
+              label={t('stationKitchen')}
+              hint={t('stationKitchenHint')}
+              on={doKitchen}
+              onChange={setDoKitchen}
+            />
+            <StationToggle
+              label={t('stationBar')}
+              hint={t('stationBarHint')}
+              on={doBar}
+              onChange={setDoBar}
+            />
+          </div>
+          {!doKitchen && !doBar && (
+            <p className="mt-2 text-[12px] font-semibold text-amber-700">{t('stationsNoneWarn')}</p>
           )}
-        </label>
+        </div>
+
+        {/* The kitchen printer is the ONLY networked one — it keeps an IP. */}
+        {doKitchen && (
+          <label>
+            <span className="mb-1 block text-xs font-bold text-ink-2">{t('kitchenPrinterIp')}</span>
+            <p className="mb-1.5 text-[12px] text-ink-3">{t('kitchenPrinterIpHint')}</p>
+            <input
+              className={PRINTER_FIELD}
+              value={kip}
+              inputMode="decimal"
+              placeholder="192.168.1.50"
+              onChange={(e) => setKip(e.target.value.trim())}
+            />
+          </label>
+        )}
+        {/* The bar printer stays configurable even on a till that doesn't
+            print bar TICKETS — a Bar-floor addition still comes out of it. */}
+        <WindowsPrinterPicker
+          label={t('barPrinterName')}
+          hint={t('barPrinterNameHint')}
+          value={bname}
+          onChange={setBname}
+          placeholder="BAR-80"
+          printers={printers}
+          listErr={listErr}
+          onRefresh={loadPrinters}
+        />
+        <WindowsPrinterPicker
+          label={t('cashierPrinterName')}
+          hint={t('cashierPrinterNameHint')}
+          value={cname}
+          onChange={setCname}
+          placeholder="POS-80"
+          printers={printers}
+          listErr={listErr}
+          onRefresh={loadPrinters}
+        />
         <div>
           <span className="mb-1.5 block text-xs font-bold text-ink-2">{t('paperWidth')}</span>
           <div className="flex gap-2">
@@ -439,7 +548,14 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
             variant="primary"
             className="flex-1"
             onClick={() => {
-              setConfig({ kitchenIp: kip, barIp: bip, sweetsIp: sip, cashierPrinterName: cname, paperWidth: pw })
+              setConfig({
+                kitchenIp: kip,
+                barPrinterName: bname,
+                cashierPrinterName: cname,
+                printsKitchen: doKitchen,
+                printsBar: doBar,
+                paperWidth: pw,
+              })
               onClose()
             }}
           >
@@ -508,6 +624,13 @@ function BillDrawer({
   // twice by a tap-out-and-back (the duplicate-espèce worry).
   const fullySettled = tabBooked || (paid > 0 && remaining <= 0.5)
   const tableRef = labelsFor(tables, session.table_ids)
+  // Which till's printer this addition comes out of. The bar settles its own
+  // floor on its own printer; every other room prints at the caisse. A joined
+  // session counts as a bar bill only if it is entirely on the bar floor —
+  // a bar table merged with a salon one is a caisse bill.
+  const sessTables = session.table_ids.map((id) => tables.find((tb) => tb.id === id))
+  const billStation: BillStation =
+    sessTables.length > 0 && sessTables.every((tb) => tb?.layer === BAR_LAYER) ? 'bar' : 'cashier'
   const served = session.status === 'served'
   const locked = session.locked
   // Any table spanning >1 physical table is a join we can undo — available at
@@ -826,11 +949,16 @@ function BillDrawer({
             label={t('printBill')}
             onClick={async () => {
               try {
-                const n = await printBill(tableRef, list, {
-                  cashier: user.name,
-                  payments: payments.filter((p) => p.session_id === session.id),
-                  discount,
-                })
+                const n = await printBill(
+                  tableRef,
+                  list,
+                  {
+                    cashier: user.name,
+                    payments: payments.filter((p) => p.session_id === session.id),
+                    discount,
+                  },
+                  billStation,
+                )
                 logPrintBill(session, user.id)
                 if (n > 0) setStrippedWarn(n)
               } catch (e) {

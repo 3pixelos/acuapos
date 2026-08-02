@@ -2,8 +2,8 @@
 
 Point-of-sale / floor-management system for **Acua** — Café · Restaurant ·
 Lounge (single location, Spain). Forked and rebranded from the Beymen POS
-codebase; multi-branch logic has been collapsed to a single location and the
-menu ships empty pending the client's real data.
+codebase; multi-branch logic has been collapsed to a single location, prices
+are in **euros**, and the UI runs in **French, English and Spanish**.
 
 - **Stack:** React 19 + TypeScript, Vite, Tailwind v4, Zustand, Supabase
   (Postgres + Realtime + RLS), Tauri (desktop till / kitchen-print), Android
@@ -65,9 +65,21 @@ Creates every table (`staff`, `restaurant_tables`, `table_sessions`,
 `order_items`, `payments`, `menu_categories`, `menu_items`, `menu_stock`,
 `friends`, `friend_debts`, `activity_log`, `report_requests`,
 `push_subscriptions`), all auth/admin RPCs, RLS policies, the realtime
-publication, default staff, a starter floor plan, and 4 empty placeholder menu
-categories (no items — the real menu goes in later). Idempotent — safe to
-re-run.
+publication and the default staff accounts. Structure only — no floor plan and
+no menu. Idempotent — safe to re-run.
+
+### 3b. Load the menu and the floor plan
+Same SQL Editor → paste
+[`supabase/acua_menu_floor_2026_08.sql`](supabase/acua_menu_floor_2026_08.sql)
+→ **Run**.
+
+Loads the 16 menu categories (8 kitchen + 8 bar) and 85 items with their euro
+prices, plus the real floor: **Front Door** (3), **Salon** (20), **Terrace**
+(20), **Bar** (2) and **À emporter** (3). Re-running rebuilds both to exactly
+that state — it refuses to run while any table is still open.
+
+Menu routing lives in `menu_categories.main`: **`food` prints in the kitchen,
+`drinks` prints at the bar.** That one column is the whole rule.
 
 ### 4. Verify RLS
 Project → **Database → Policies**. Confirm:
@@ -84,7 +96,8 @@ Seed logins (change before real use, admin → **Staff** tab):
 - Waiters: `serveur1` PIN `1111`, `serveur2` PIN `2222`
 
 **Done when** the app loads against the project, you can log in as admin, the
-floor map shows the starter tables, and the menu tabs are present but empty.
+floor map shows the five sections, and the order screen shows **Cuisine** and
+**Bar** with their categories underneath.
 
 ---
 

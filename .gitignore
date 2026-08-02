@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Built APK handed to the client (rebuilt by .github/workflows/build-android.yml)
+dist-apk

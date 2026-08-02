@@ -3,7 +3,7 @@ import { AlertTriangle, Delete, HelpCircle, KeyRound, Languages, Mail, Monitor, 
 import { useAuth } from '../state/auth'
 import { PoweredBy } from '../components/PoweredBy'
 import { AcuaLogo } from '../components/AcuaLogo'
-import { useI18n } from '../lib/i18n'
+import { LANG_LABEL, nextLang, useI18n } from '../lib/i18n'
 
 /** Support contacts, most reachable first: the two lines that take both a
  * call and WhatsApp, then the call-only line, then the WhatsApp-only one.
@@ -36,11 +36,11 @@ export function Login() {
         {t('helpContact')}
       </button>
       <button
-        onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+        onClick={() => setLang(nextLang(lang))}
         className="absolute top-4 right-4 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-xs font-bold text-ink-2"
       >
         <Languages size={14} />
-        {lang === 'fr' ? 'Français' : 'English'}
+        {LANG_LABEL[lang]}
       </button>
 
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}

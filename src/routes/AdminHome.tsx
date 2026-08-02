@@ -284,7 +284,7 @@ function LiveMap({ branch }: { branch: BranchScope }) {
   const { tables, sessions, items, staff } = useData()
   const now = useNow()
   const t = useI18n((s) => s.t)
-  const [layer, setLayer] = useState<LayerId>('terrasse')
+  const [layer, setLayer] = useState<LayerId>(BRANCH_LAYERS.main[0])
   const [confirmFor, setConfirmFor] = useState<TableSession | null>(null)
   const [secret, setSecret] = useState('')
   const [err, setErr] = useState('')

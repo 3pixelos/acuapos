@@ -4,8 +4,9 @@
 -- kept for schema parity with the app, but only ever holds 'main'.
 --
 -- Produces the same table structure, RPCs, RLS and realtime as the Beymen
--- build, minus every Beymen-specific data seed. The menu ships EMPTY (a few
--- placeholder categories, no items) — the client provides real menu data.
+-- build, minus every Beymen-specific data seed. Structure and staff only —
+-- run acua_menu_floor_2026_08.sql straight after this for the real menu and
+-- the real floor plan.
 -- Idempotent: safe to re-run.
 -- ============================================================
 create extension if not exists pgcrypto with schema extensions;
@@ -33,7 +34,7 @@ create table if not exists restaurant_tables (
   label text not null,
   seats int not null,
   zone text not null,
-  layer text,                                   -- terrasse | salon | etage2 | emporter
+  layer text,                                   -- frontdoor | salon | terrasse | bar | emporter
   sort int not null default 0,
   vip boolean not null default false,
   x numeric not null,
@@ -106,9 +107,12 @@ create table if not exists menu_categories (
   id uuid primary key default gen_random_uuid(),
   name_fr text not null,
   name_en text not null,
+  name_es text,
+  -- 'food' (prints in the KITCHEN) or 'drinks' (prints at the BAR).
   main text not null default '',
   sort int not null default 0
 );
+alter table menu_categories add column if not exists name_es text;
 
 create table if not exists menu_items (
   id uuid primary key default gen_random_uuid(),
@@ -377,7 +381,8 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- ============================================================
--- Seed: default staff + a starter floor plan. MENU LEFT EMPTY on purpose.
+-- Seed: default staff only. The floor plan and the menu come from
+-- acua_menu_floor_2026_08.sql, which is the single source of truth for both.
 -- CHANGE THESE PINS/PASSWORDS before going live.
 -- ============================================================
 insert into staff (name, username, role, secret_hash, secret_plain, color, branch) values
@@ -387,26 +392,6 @@ insert into staff (name, username, role, secret_hash, secret_plain, color, branc
   ('Serveur 2', 'serveur2', 'waiter', crypt('2222', gen_salt('bf')), '2222', '#EC4899', 'main')
 on conflict (username) do nothing;
 
-insert into restaurant_tables (id, label, seats, zone, layer, sort, vip, x, y, branch) values
-  ('T1', 'T1', 2, 'Salon', 'salon', 1, false, 14, 16, 'main'),
-  ('T2', 'T2', 2, 'Salon', 'salon', 2, false, 38, 16, 'main'),
-  ('T3', 'T3', 4, 'Salon', 'salon', 3, false, 62, 16, 'main'),
-  ('T4', 'T4', 4, 'Salon', 'salon', 4, false, 86, 16, 'main'),
-  ('T5', 'T5', 6, 'Salon', 'salon', 5, false, 20, 42, 'main'),
-  ('T6', 'T6', 6, 'Salon', 'salon', 6, false, 50, 42, 'main'),
-  ('B1', 'B1', 2, 'Terrasse', 'terrasse', 1, false, 14, 76, 'main'),
-  ('B2', 'B2', 2, 'Terrasse', 'terrasse', 2, false, 38, 76, 'main'),
-  ('B3', 'B3', 4, 'Terrasse', 'terrasse', 3, false, 62, 76, 'main'),
-  ('EMP1', 'EMP1', 1, 'Emporter', 'emporter', 1, false, 20, 50, 'main')
-on conflict (id) do nothing;
-
--- Placeholder categories so the order screen has tabs. NO items — the client
--- supplies the real menu. Delete/replace these when real data lands.
-insert into menu_categories (name_fr, name_en, main, sort)
-select * from (values
-  ('Entrées', 'Starters', '', 1),
-  ('Plats', 'Mains', '', 2),
-  ('Desserts', 'Desserts', '', 3),
-  ('Boissons', 'Drinks', '', 4)
-) as v(name_fr, name_en, main, sort)
-where not exists (select 1 from menu_categories);
+-- The real floor plan and the real menu both live in
+-- supabase/acua_menu_floor_2026_08.sql — run that straight after this file.
+-- Nothing is seeded here on purpose, so the two can never disagree.
