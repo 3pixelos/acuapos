@@ -176,8 +176,14 @@ export function Drawer({
 export function Modal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   return (
     <Scrim onClose={onClose} center>
+      {/* A modal taller than the screen used to be simply unreachable: the
+          panel had no height cap and no scroller, so the bottom — including
+          Save — was clipped off with no way to get to it. The printer
+          settings hit this first, being the longest form in the app.
+          `overscroll-contain` keeps a flick at the end of the list from
+          scrolling the floor map behind it. */}
       <div
-        className="anim-sheet w-full max-w-sm rounded-2xl bg-surface p-6 shadow-(--shadow-3)"
+        className="anim-sheet max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl bg-surface p-6 shadow-(--shadow-3)"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
