@@ -152,29 +152,38 @@ export function AvailabilityManager({ branch }: { branch?: Branch }) {
 function PriceInput({ item, staffId }: { item: MenuItemT; staffId: string }) {
   const [draft, setDraft] = useState(String(item.price))
   const [editing, setEditing] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const t = useI18n((s) => s.t)
 
   // pick up outside changes (another device) while not being edited
   useEffect(() => {
     if (!editing) setDraft(String(item.price))
   }, [item.price, editing])
 
-  const commit = () => {
+  const commit = async () => {
     setEditing(false)
+    setFailed(false)
     // Euro prices carry cents (9,95) — rounding to a whole unit here, as the
     // dirham build did, would silently turn 9,95 into 10.
     const n = Math.max(0, Math.round(Number(draft.replace(',', '.')) * 100) / 100)
     if (!Number.isFinite(n) || n === item.price) return setDraft(String(item.price))
-    void setItemPrice(item, n, staffId)
+    // Say so when it doesn't stick. Showing the new number and reverting on
+    // the next refresh is the one behaviour that wastes someone's evening.
+    if (!(await setItemPrice(item, n, staffId))) {
+      setDraft(String(item.price))
+      setFailed(true)
+    }
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1">
+    <span className="inline-flex shrink-0 flex-col items-end gap-0.5">
+      <span className="inline-flex items-center gap-1">
       <input
         value={draft}
         inputMode="decimal"
         onFocus={() => setEditing(true)}
         onChange={(e) => setDraft(e.target.value.replace(/[^\d.,]/g, ''))}
-        onBlur={commit}
+        onBlur={() => void commit()}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           if (e.key === 'Escape') {
@@ -184,9 +193,17 @@ function PriceInput({ item, staffId }: { item: MenuItemT; staffId: string }) {
           }
         }}
         aria-label={`Prix ${item.name}`}
-        className="tnum h-9 w-16 rounded-lg border border-line-2 bg-surface-2 px-2 text-right text-[14px] font-bold outline-none focus:border-accent"
+        className={`tnum h-9 w-16 rounded-lg border bg-surface-2 px-2 text-right text-[14px] font-bold outline-none focus:border-accent ${
+          failed ? 'border-danger' : 'border-line-2'
+        }`}
       />
       <span className="text-[12px] font-semibold text-ink-3">€</span>
+      </span>
+      {failed && (
+        <span className="text-[11px] font-bold whitespace-nowrap text-danger">
+          {t('priceNotSaved')}
+        </span>
+      )}
     </span>
   )
 }

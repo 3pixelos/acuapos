@@ -542,14 +542,43 @@ export async function addItem(sessionId: string, m: MenuItem, category: string) 
  * order_items store their own price, so past bills and revenue are frozen
  * at what was actually charged.
  */
-export async function setItemPrice(m: MenuItem, price: number, staffId: string) {
+/**
+ * Change a menu item's price. Returns whether it actually stuck.
+ *
+ * The check on the returned rows is the point. A write the database refuses
+ * on a permissions grounds does NOT come back as an error — it comes back as
+ * "you updated every row you were allowed to, which was none", HTTP 200 and
+ * an empty list. That is how a missing RLS policy on `menu_items` turned into
+ * a price editor that showed the new value, said nothing, and quietly put the
+ * old one back on the next refresh. Asking for the updated rows turns a
+ * silent no-op into something the caller can report.
+ */
+export async function setItemPrice(
+  m: MenuItem,
+  price: number,
+  staffId: string,
+): Promise<boolean> {
+  const previous = m.price
   useData.setState((st) => ({
     menu: st.menu.map((x) => (x.id === m.id ? { ...x, price } : x)),
   }))
-  const { error } = await supabase.from('menu_items').update({ price }).eq('id', m.id)
-  if (error) console.error('[price] update failed:', error)
-  log(staffId, 'price', '', { name: m.name, from: m.price, to: price })
+  const { data, error } = await supabase
+    .from('menu_items')
+    .update({ price })
+    .eq('id', m.id)
+    .select('id')
+  if (error || !data?.length) {
+    console.error('[price] not saved — no row was updated', error)
+    // Put the old price back rather than leaving the screen showing a change
+    // the database never accepted.
+    useData.setState((st) => ({
+      menu: st.menu.map((x) => (x.id === m.id ? { ...x, price: previous } : x)),
+    }))
+    return false
+  }
+  log(staffId, 'price', '', { name: m.name, from: previous, to: price })
   bgRefresh()
+  return true
 }
 
 /**

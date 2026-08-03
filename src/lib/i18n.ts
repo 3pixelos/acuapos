@@ -538,6 +538,7 @@ const dict = {
   outOfStock: ['Rupture', 'Out of stock', 'Sin existencias'],
   outOfStockShort: ['rupture', 'out', 'agotado'],
   outOfStockToast: ['Rupture de stock', 'Out of stock', 'Sin existencias'],
+  priceNotSaved: ['Prix non enregistré', 'Price not saved', 'Precio no guardado'],
   changeDrink: ['changer', 'change', 'cambiar'],
   chooseDrinksColdHot: [
     'Boissons incluses — 1 froide et 1 chaude',
