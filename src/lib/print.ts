@@ -72,15 +72,8 @@ export function buildKitchenTicket(opts: {
     drinkGroups.set(parent, [...(drinkGroups.get(parent) ?? []), i])
   }
 
-  for (const i of normal) {
-    p.size(1, 1).line(`${i.qty}  ${i.name.toUpperCase()}`).size(0, 0)
-    // notes are instructions for the cook — bold, tall and uppercase so
-    // they can't be missed on the rail
-    if (i.note) p.bold(true).size(0, 1).line(`   » ${i.note.toUpperCase()}`).size(0, 0).bold(false)
-    p.feed(1)
-  }
-  for (const [parent, drinks] of drinkGroups) {
-    p.size(1, 1).line(parent.toUpperCase()).size(0, 0)
+  /** The drinks that came free with a dish, bulleted under it. */
+  const putDrinks = (drinks: OrderItem[]) => {
     for (const d of drinks) {
       const sep = d.name.indexOf(' — ')
       const label = sep > 0 ? d.name.slice(sep + 3) : d.name
@@ -90,6 +83,29 @@ export function buildKitchenTicket(opts: {
       // the waiter's note on the included drink (e.g. "sans sucre")
       if (d.note) p.bold(true).size(0, 1).line(`      » ${d.note.toUpperCase()}`).size(0, 0).bold(false)
     }
+  }
+
+  for (const i of normal) {
+    p.size(1, 1).line(`${i.qty}  ${i.name.toUpperCase()}`).size(0, 0)
+    // notes are instructions for the cook — bold, tall and uppercase so
+    // they can't be missed on the rail
+    if (i.note) p.bold(true).size(0, 1).line(`   » ${i.note.toUpperCase()}`).size(0, 0).bold(false)
+    // The free drink belongs to the dish above it, so it prints there. It
+    // used to be collected into a second block at the foot of the ticket,
+    // which repeated every breakfast's name and made the line read the
+    // ticket twice to see that one order was one plate plus one drink.
+    const mine = drinkGroups.get(i.name)
+    if (mine) {
+      putDrinks(mine)
+      drinkGroups.delete(i.name)
+    }
+    p.feed(1)
+  }
+  // Anything left belongs to a dish sent on an EARLIER ticket — keep it,
+  // under its own header, rather than dropping it.
+  for (const [parent, drinks] of drinkGroups) {
+    p.size(1, 1).line(parent.toUpperCase()).size(0, 0)
+    putDrinks(drinks)
     p.feed(1)
   }
 
@@ -133,14 +149,15 @@ export interface BillMeta {
   discount?: number
 }
 
-// TODO(client): supply Acua's real receipt footer — website, socials,
-// tax/registration number and address. Placeholders for now.
-const FOOTER = [
-  'MERCI POUR VOTRE VISITE',
-  'WWW.ACUA.ES',
-  'INSTAGRAM:ACUA',
-  'ACUA',
-]
+/** Printed under the logo on every customer-facing document, matching the
+ * wordmark's own tagline. CP1252 covers both the É and the middot. */
+const TAGLINE = 'CAFÉ · RESTAURANT · LOUNGE'
+
+/** Contact block at the foot of a customer bill. No website line — there is
+ * no website — and no invented address or tax number: a receipt is a legal
+ * document in Spain, so a placeholder there would be worse than a gap.
+ * TODO(client): add the fiscal details (NIF/CIF, address) when supplied. */
+const FOOTER = ['MERCI POUR VOTRE VISITE', 'INSTAGRAM: ACUA.BANUS']
 
 /** Sequential bill number for this till (T-1, T-2, …), device-local. */
 function nextBillNo(): string {
@@ -170,16 +187,26 @@ export function buildBill(
   const total = gross * (1 - discount / 100)
   const p = new EscPos()
 
-  // the bull emblem instead of the plain "ACUA" text header
+  // ACUA wordmark, then the tagline, then breathing room — a receipt is the
+  // last thing a customer is handed, so the head of it is the brand.
   p.align('center').image(receiptLogoRaster(), RECEIPT_LOGO_WIDTH, RECEIPT_LOGO_HEIGHT)
-  p.bold(false).line('RESTAURANT')
+  p.bold(false).line(TAGLINE)
   if (isTakeout(tableRef)) {
-    p.invert(true).bold(true).size(1, 1).line(' A EMPORTER ').size(0, 0).bold(false).invert(false)
+    p.feed(1).invert(true).bold(true).size(1, 1).line(' A EMPORTER ').size(0, 0).bold(false).invert(false)
   }
-  p.align('left').rule(cols)
+  p.feed(1)
 
+  // Table and time up top, where a customer looks first to check the bill is
+  // theirs. They used to appear only in the block underneath the total.
+  p.bold(true).size(0, 1).line(`TABLE ${tableRef}`).size(0, 0).bold(false)
+  p.line(stamp())
+  p.align('left').feed(1).rule(cols)
+
+  // A free included drink prints as "OFFERT" rather than 0.00 — a line
+  // reading zero looks like a pricing mistake to whoever is paying.
   for (const i of items) {
-    p.line(lr(`${i.qty}  ${i.name.toUpperCase()}`, i.price === 0 ? '0.00' : (i.price * i.qty).toFixed(2), cols))
+    const amount = i.price === 0 ? 'OFFERT' : (i.price * i.qty).toFixed(2)
+    p.line(lr(`${i.qty}  ${i.name.toUpperCase()}`, amount, cols))
   }
   p.rule(cols)
 
@@ -190,22 +217,21 @@ export function buildBill(
     p.bold(true).line(lr(label, `-${(gross - total).toFixed(2)} €`, cols)).bold(false)
   }
   p.bold(true).size(1, 1)
-  p.line(lr('TOTAL NET:', `${total.toFixed(2)} €`, Math.floor(cols / 2)))
+  p.line(lr('TOTAL', `${total.toFixed(2)} €`, Math.floor(cols / 2)))
   p.size(0, 0).bold(false).rule(cols)
 
   const pays = meta.payments ?? []
   for (const pay of pays) {
     const label = pay.method === 'cash' ? 'ESPECES' : 'CARTE'
-    p.line(`* ${label.padEnd(9)}: ${pay.amount.toFixed(2)} €${kindNote(pay.kind)}`)
+    p.line(lr(`  ${label}${kindNote(pay.kind)}`, `${pay.amount.toFixed(2)} €`, cols))
   }
-  if (meta.cashier) p.line(`* ${'CAISSIER'.padEnd(9)}: ${meta.cashier.toUpperCase()}`)
-  p.line(`* ${'N° TICKET'.padEnd(9)}: ${nextBillNo()}`)
-  p.line(`* ${'TABLE'.padEnd(9)}: ${tableRef}`)
-  p.rule(cols)
+  if (pays.length) p.feed(1)
+  if (meta.cashier) p.line(`${'CAISSIER'.padEnd(11)}: ${meta.cashier.toUpperCase()}`)
+  p.line(`${'N° TICKET'.padEnd(11)}: ${nextBillNo()}`)
 
-  p.align('center')
+  p.feed(1).align('center')
   for (const l of FOOTER) p.line(l)
-  p.feed(1).line(stamp()).align('left')
+  p.align('left')
   p.cut()
   return p.bytes()
 }
@@ -237,7 +263,7 @@ export interface FriendStatementData {
 export function buildFriendStatement(d: FriendStatementData, cols = 42): Uint8Array {
   const p = new EscPos()
   p.align('center').image(receiptLogoRaster(), RECEIPT_LOGO_WIDTH, RECEIPT_LOGO_HEIGHT)
-  p.bold(false).line('RESTAURANT')
+  p.bold(false).line(TAGLINE)
   p.bold(true).size(0, 1).line('ADDITION AMI').size(0, 0).bold(false)
   p.line(d.friendName.toUpperCase())
   p.line(d.periodLabel)
@@ -288,7 +314,7 @@ function printFriendStatementHtml(d: FriendStatementData) {
     .join('')
   const html = `
     <div style="text-align:center"><img src="${RECEIPT_LOGO_PNG}" alt="ACUA" style="width:96px;height:96px" /></div>
-    <div style="text-align:center;font-size:10px;letter-spacing:2px">RESTAURANT</div>
+    <div style="text-align:center;font-size:10px;letter-spacing:2px">${esc(TAGLINE)}</div>
     <div style="text-align:center;font-weight:800;font-size:14px;margin-top:4px">ADDITION AMI</div>
     <div style="text-align:center;font-size:13px;font-weight:700">${esc(d.friendName)}</div>
     <div style="text-align:center;font-size:11px">${esc(d.periodLabel)}</div>
@@ -375,7 +401,7 @@ export function buildSalesReport(d: SalesReportData, cols = 42): Uint8Array {
   const nameW = cols - 14
 
   p.align('center').image(receiptLogoRaster(), RECEIPT_LOGO_WIDTH, RECEIPT_LOGO_HEIGHT)
-  p.bold(false).line('RESTAURANT')
+  p.bold(false).line(TAGLINE)
   p.bold(true).size(0, 1).line('RELEVE DE VENTES').size(0, 0).bold(false)
   // branch band — makes it obvious this is one restaurant's day, not both
   if (d.branchLabel)
@@ -473,7 +499,7 @@ function printSalesReportHtml(d: SalesReportData) {
     : d.lines.map(itemRow).join('')
   const html = `
     <div style="text-align:center"><img src="${RECEIPT_LOGO_PNG}" alt="ACUA" style="width:96px;height:96px" /></div>
-    <div style="text-align:center;font-size:10px;letter-spacing:2px">RESTAURANT</div>
+    <div style="text-align:center;font-size:10px;letter-spacing:2px">${esc(TAGLINE)}</div>
     <div style="text-align:center;font-weight:800;font-size:14px;margin-top:4px">RELEVÉ DE VENTES</div>
     ${d.branchLabel ? `<div style="text-align:center;font-weight:800;font-size:12px;background:#000;color:#fff;padding:1px 0;margin:3px 0">${esc(d.branchLabel.toUpperCase())}</div>` : ''}
     <div style="text-align:center;font-size:12px">${esc(d.scopeLabel)} — ${esc(d.periodLabel)}</div>
@@ -579,7 +605,7 @@ function printBillHtml(tableRef: string, rawItems: OrderItem[], meta: BillMeta) 
     <div style="text-align:center;font-size:11px;margin-top:8px">${FOOTER.join('<br/>')}</div>`
   const html = `
     <div style="text-align:center"><img src="${RECEIPT_LOGO_PNG}" alt="ACUA" style="width:96px;height:96px" /></div>
-    <div style="text-align:center;font-size:10px;letter-spacing:2px">RESTAURANT</div>
+    <div style="text-align:center;font-size:10px;letter-spacing:2px">${esc(TAGLINE)}</div>
     ${isTakeout(tableRef) ? '<div style="text-align:center;font-weight:800;background:#000;color:#fff;padding:2px 0;margin:4px 0">À EMPORTER</div>' : ''}
     <div style="text-align:center">Table ${esc(tableRef)}</div>
     <div style="text-align:center;font-size:11px">${stamp()}</div>
