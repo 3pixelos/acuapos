@@ -480,6 +480,18 @@ function WindowsPrinterPicker({
           )}
         </>
       )}
+      {/* Every station gets the same way in, whether or not Windows happens
+          to know its current value — otherwise which fields you could type an
+          IP into looked arbitrary. */}
+      {printers.length > 0 && !manual && (
+        <button
+          type="button"
+          onClick={() => setManual(true)}
+          className="mt-1 text-[12px] font-semibold text-accent underline"
+        >
+          {t('printerEnterManually')}
+        </button>
+      )}
       {testResult && (
         <p
           className={`mt-1 text-[12px] font-semibold ${

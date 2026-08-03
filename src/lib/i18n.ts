@@ -210,6 +210,11 @@ const dict = {
   ],
   printerManualOption: ['Autre… (saisir un nom ou une IP)', 'Other… (type a name or IP)', 'Otra… (escribir nombre o IP)'],
   printerBackToList: ['← Revenir à la liste', '← Back to the list', '← Volver a la lista'],
+  printerEnterManually: [
+    'Saisir un nom ou une IP →',
+    'Type a name or IP →',
+    'Escribir un nombre o IP →',
+  ],
   kitchenPrinterName: ['Imprimante cuisine', 'Kitchen printer', 'Impresora de cocina'],
   kitchenPrinterNameHint: [
     'Elle ne reçoit que les plats. Choisissez-la dans la liste Windows, ou « Autre… » pour saisir son IP si elle est en réseau.',
