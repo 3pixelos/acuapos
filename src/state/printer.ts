@@ -42,12 +42,22 @@ export const BAR_PRINTER_DISABLED = true
 export const effectiveBarPrinter = (barPrinterName: string) =>
   BAR_PRINTER_DISABLED ? '' : barPrinterName
 
-/** A till pinned to the bar would claim only bar tickets and then have
- * nowhere to send them, so while the bar is out of service every till acts
- * as the main one. Without this, a machine left on "caisse du bar" would
- * silently print nothing at all. */
-export const effectiveTillRole = (tillRole: TillRole): TillRole =>
-  BAR_PRINTER_DISABLED ? 'main' : tillRole
+/**
+ * The till's role is used as-is, and that is deliberate.
+ *
+ * An earlier version of this forced every till to `main` while the bar
+ * printer was out of service, reasoning that a till stuck on `bar` would
+ * have nowhere to send its tickets. That was backwards: with the bar out of
+ * service the MAIN till already prints both stations, so overriding the role
+ * made a second machine claim the same tickets and print everything twice —
+ * the exact failure the role was introduced to prevent.
+ *
+ * A till set to `bar` standing down is the correct behaviour here: its work
+ * is being done by the main till. It reports "Bar non configurée" rather
+ * than pretending, so a single-till setup left on `bar` by mistake is
+ * visible instead of silent.
+ */
+export const effectiveTillRole = (tillRole: TillRole): TillRole => tillRole
 
 /**
  * What we actually KNOW about a station's printer. It used to be a boolean
