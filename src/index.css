@@ -58,6 +58,26 @@ button {
   touch-action: manipulation;
 }
 
+/* This is a till, not a document. Dragging a finger or a mouse across the
+ * screen used to select whatever text it crossed and paint the interface
+ * blue — trivial to trigger on a touchscreen, and it made the printer
+ * settings look broken because the labels highlighted instead of the field
+ * taking the cursor. Text you might genuinely want to copy (fields, receipt
+ * previews) opts back in below. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* iOS Safari zooms the page on focus if a field's font-size is under 16px.
    Force 16px on every text field (even against a smaller Tailwind text-*
    utility) so typing never triggers that zoom — keeps the layout stable

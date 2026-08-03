@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   ArrowRightLeft,
   Package,
@@ -377,6 +377,7 @@ function WindowsPrinterPicker({
   // A value Windows doesn't know (typically an IP) means this station was
   // already set by hand — come back to the text box, not an empty dropdown.
   const [manual, setManual] = useState(Boolean(value) && !printers.includes(value))
+  const fieldId = useId()
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const paperWidth = usePrinter((s) => s.paperWidth)
@@ -394,9 +395,11 @@ function WindowsPrinterPicker({
     }
   }
   return (
-    <label>
+    <div>
       <span className="mb-1 flex items-center justify-between gap-2 text-xs font-bold text-ink-2">
-        <span className="min-w-0 truncate">{label}</span>
+        <label htmlFor={fieldId} className="min-w-0 truncate">
+          {label}
+        </label>
         <span className="flex shrink-0 gap-1.5">
           {/* The only honest way to answer "is this the right printer?" — the
               badges can only report on tickets that happened to be queued. */}
@@ -420,6 +423,7 @@ function WindowsPrinterPicker({
       <p className="mb-1.5 text-[12px] text-ink-3">{hint}</p>
       {printers.length > 0 && !manual ? (
         <select
+          id={fieldId}
           className={PRINTER_FIELD}
           value={value}
           onChange={(e) => {
@@ -447,10 +451,16 @@ function WindowsPrinterPicker({
         // the exact Windows name, or an IP for a network printer
         <>
           <input
+            id={fieldId}
             className={PRINTER_FIELD}
             value={value}
             placeholder={placeholder}
-            onChange={(e) => onChange(e.target.value.trim())}
+            autoComplete="off"
+            spellCheck={false}
+            // Trimming on every keystroke fought the typist: a trailing
+            // space vanished mid-word. Trim once, on blur.
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={(e) => onChange(e.target.value.trim())}
           />
           {printers.length > 0 ? (
             <button
@@ -479,7 +489,7 @@ function WindowsPrinterPicker({
           {testResult.msg}
         </p>
       )}
-    </label>
+    </div>
   )
 }
 
