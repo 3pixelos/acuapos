@@ -57,6 +57,9 @@ import { inTauri, listPrinters, sendToPrinter } from '../lib/tauri'
 import {
   usePrinter,
   columnsFor,
+  BAR_PRINTER_DISABLED,
+  effectiveBarPrinter,
+  effectiveTillRole,
   type PaperWidth,
   type StationHealth,
   type TillRole,
@@ -295,9 +298,12 @@ export function CaisseHome() {
 /** Small badge telling the cashier whether kitchen tickets are printing —
  * the only screen anywhere near the kitchen printer. */
 function PrinterStatus() {
-  const { kitchenHealth, barHealth, barPrinterName, tillRole, queued } = usePrinter()
+  const { kitchenHealth, barHealth, queued } = usePrinter()
   const t = useI18n((s) => s.t)
-  const stations = stationsFor(tillRole, barPrinterName)
+  // Effective, not typed: while the bar printer is out of service there is no
+  // bar station, so no bar badge.
+  const barPrinterName = effectiveBarPrinter(usePrinter((s) => s.barPrinterName))
+  const stations = stationsFor(effectiveTillRole(usePrinter((s) => s.tillRole)), barPrinterName)
   if (!inTauri()) return null
   // The badge says what is KNOWN, never more. "OK" means a ticket really
   // came out; a printer nothing has been sent to yet says so rather than
@@ -616,6 +622,11 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
           listErr={listErr}
           onRefresh={loadPrinters}
         />
+        {BAR_PRINTER_DISABLED && (
+          <p className="rounded-xl bg-amber-100 px-3 py-2 text-[12px] font-semibold text-amber-800">
+            {t('barPrinterDisabled')}
+          </p>
+        )}
         <WindowsPrinterPicker
           label={t('barPrinterName')}
           hint={t('barPrinterNameHint')}

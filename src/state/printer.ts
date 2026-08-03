@@ -19,6 +19,37 @@ export type PaperWidth = 58 | 80
 export type TillRole = 'main' | 'bar'
 
 /**
+ * THE BAR PRINTER IS OUT OF SERVICE (2026-08-03).
+ *
+ * The till already has a printer name typed into the bar field and there is
+ * nobody on site to clear it, so the app has to ignore it from here instead.
+ * While this is true every station behaves as if no bar printer had ever been
+ * configured, which the existing fallbacks already handle correctly:
+ *
+ *   - drink tickets print at the KITCHEN, alongside the food
+ *   - a Bar-floor addition prints at the CAISSE
+ *   - the bar status badge disappears, because there is no bar station
+ *
+ * The stored value is left untouched, not wiped — flipping this back to
+ * false is the only edit needed to bring the real bar printer into service,
+ * and whatever was typed will still be there.
+ */
+export const BAR_PRINTER_DISABLED = true
+
+/** The bar printer the app should actually print to — empty while the bar
+ * printer is out of service. Read this, never `barPrinterName`, anywhere a
+ * ticket or a bill is about to be sent. */
+export const effectiveBarPrinter = (barPrinterName: string) =>
+  BAR_PRINTER_DISABLED ? '' : barPrinterName
+
+/** A till pinned to the bar would claim only bar tickets and then have
+ * nowhere to send them, so while the bar is out of service every till acts
+ * as the main one. Without this, a machine left on "caisse du bar" would
+ * silently print nothing at all. */
+export const effectiveTillRole = (tillRole: TillRole): TillRole =>
+  BAR_PRINTER_DISABLED ? 'main' : tillRole
+
+/**
  * What we actually KNOW about a station's printer. It used to be a boolean
  * that started `true` and was reset to `true` on every empty queue, so a till
  * with no printer configured at all cheerfully showed "Cuisine OK" — the one

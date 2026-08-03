@@ -2,7 +2,13 @@ import { useEffect } from 'react'
 import { supabase } from './supabase'
 import { buildKitchenTicket } from './print'
 import { inTauri, sendToPrinter } from './tauri'
-import { usePrinter, columnsFor, type TillRole } from '../state/printer'
+import {
+  usePrinter,
+  columnsFor,
+  effectiveBarPrinter,
+  effectiveTillRole,
+  type TillRole,
+} from '../state/printer'
 import { deviceBranch } from '../state/auth'
 import { BAR_ROUTED_ITEM_NAMES, INCLUDED_DRINK_CATEGORY, type OrderItem } from './types'
 
@@ -147,8 +153,13 @@ export function useKitchenPrintService() {
 
           await loadMenuRouting()
 
-          const { kitchenPrinterName, barPrinterName, tillRole, paperWidth } =
-            usePrinter.getState()
+          const cfg = usePrinter.getState()
+          const { kitchenPrinterName, paperWidth } = cfg
+          // Never the raw values: while the bar printer is out of service
+          // these collapse to "no bar station", which sends the drinks to
+          // the kitchen instead of queueing them against a dead printer.
+          const barPrinterName = effectiveBarPrinter(cfg.barPrinterName)
+          const tillRole = effectiveTillRole(cfg.tillRole)
 
           // STATION OWNERSHIP, from the one thing the cashier picked: is this
           // the main caisse or the bar's? Both tills run this service against

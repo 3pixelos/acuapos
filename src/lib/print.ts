@@ -3,7 +3,7 @@ import { INCLUDED_DRINK_CATEGORY } from './types'
 import { money } from './format'
 import { EscPos, lr } from './escpos'
 import { inTauri, sendToPrinter } from './tauri'
-import { usePrinter, columnsFor } from '../state/printer'
+import { usePrinter, columnsFor, effectiveBarPrinter } from '../state/printer'
 import {
   RECEIPT_LOGO_HEIGHT,
   RECEIPT_LOGO_PNG,
@@ -534,7 +534,9 @@ export async function printBill(
   station: BillStation = 'cashier',
 ): Promise<number> {
   const stripped = items.filter((i) => !sentToKitchen(i) && !i.voided).length
-  const { cashierPrinterName, barPrinterName, paperWidth } = usePrinter.getState()
+  const { cashierPrinterName, paperWidth } = usePrinter.getState()
+  // Out of service -> empty -> a Bar-floor addition falls back to the caisse.
+  const barPrinterName = effectiveBarPrinter(usePrinter.getState().barPrinterName)
   const target = station === 'bar' ? barPrinterName || cashierPrinterName : cashierPrinterName
   if (inTauri() && target) {
     await sendToPrinter(target, buildBill(tableRef, items, meta, columnsFor(paperWidth)))

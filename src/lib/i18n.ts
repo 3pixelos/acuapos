@@ -221,6 +221,11 @@ const dict = {
     'It receives food items only. Pick it from the Windows list, or "Other…" to type its IP if it is on the network.',
     'Solo recibe los platos. Elígela en la lista de Windows, o «Otra…» para escribir su IP si está en red.',
   ],
+  barPrinterDisabled: [
+    'Imprimante bar HORS SERVICE — peu importe ce qui est écrit ci-dessous, les boissons sortent en cuisine et les additions du Bar à la caisse.',
+    'Bar printer OUT OF SERVICE — whatever is written below is ignored: drinks print in the kitchen and Bar bills at the caisse.',
+    'Impresora de barra FUERA DE SERVICIO — se ignora lo que ponga abajo: las bebidas salen en cocina y las cuentas de la Barra en caja.',
+  ],
   barPrinterName: ['Imprimante bar', 'Bar printer', 'Impresora de la barra'],
   barPrinterNameHint: [
     'Elle reçoit les boissons et les additions des tables du Bar. Vide = tout part en cuisine.',
