@@ -22,6 +22,7 @@ import { clock, money } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import type { MenuCategory, MenuItem as MenuItemT, MenuMain, OrderItem, TableSession } from '../lib/types'
 import {
+  autoIncludedDrinkFor,
   catName,
   DRINK_INCLUDED_CATEGORIES,
   NO_INCLUDED_DRINK_ITEMS,
@@ -480,7 +481,15 @@ export function OrderDrawer({
                       setDrinkAsk({ name: m.name, add: { item: m, cat } })
                       return
                     }
-                    void addItem(session.id, m, cat ? cat.name_fr : '')
+                    // Breakfasts whose drink is fixed get it added for them —
+                    // no picker, because there is nothing to choose.
+                    const auto = autoIncludedDrinkFor(m.name)
+                    void (async () => {
+                      await addItem(session.id, m, cat ? cat.name_fr : '')
+                      for (let k = 0; auto && k < auto.qty; k++) {
+                        await addIncludedDrink(session.id, auto.drinkFr, m.name)
+                      }
+                    })()
                     toastNow(m.name)
                   }}
                   aria-label={`+ ${m.name}`}

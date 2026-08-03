@@ -59,12 +59,19 @@ export function layersForRole(branch: Branch, role: Role): LayerId[] {
   return role === 'waiter' ? all.filter((l) => !CAISSE_ONLY_LAYERS.includes(l)) : all
 }
 
+/** How a table is drawn on the floor map. It is decoration with a purpose:
+ * a waiter finds a table by recognising its shape in the room, not by
+ * reading a label. `long` are the sofa benches, `round` the circular tops.
+ * Absent on a pre-migration row, which falls back to sizing by seat count. */
+export type TableShape = 'square' | 'round' | 'long'
+
 export interface RestaurantTable {
   id: string
   label: string
   seats: number
   zone: string
   layer: LayerId
+  shape?: TableShape | null
   sort: number
   vip: boolean
   x: number
@@ -229,12 +236,36 @@ export interface Payment {
  * means a new subcategory can never be routed wrong — whoever adds it only
  * has to answer "kitchen or bar?", which is the same question the line
  * cooks and the barman ask. */
-export const MENU_MAINS = ['food', 'drinks'] as const
+export const MENU_MAINS = ['breakfast', 'food', 'drinks'] as const
 export type MenuMain = (typeof MENU_MAINS)[number]
 
-/** Sentinel category for the free drink included with Formulas / Turkish
- * Breakfast items. Routes the line to the BAR printer and prices it at 0. */
+/** Sentinel category for the free drink included with a breakfast. Routes
+ * the line to the BAR printer and prices it at 0. */
 export const INCLUDED_DRINK_CATEGORY = 'Boisson incluse'
+
+/**
+ * Breakfasts whose drink is FIXED, not chosen. Adding one of these puts the
+ * drink on the order automatically — there is no picker, because there is
+ * nothing to pick: the drink is part of the dish.
+ *
+ * Matched on the item's exact name, case-insensitively. `qty` is how many
+ * drinks come with one of them (the 2-person Turkish breakfast brings two).
+ */
+export const AUTO_INCLUDED_DRINKS: ReadonlyArray<{
+  item: string
+  drinkFr: string
+  qty: number
+}> = [
+  { item: 'Breakfast Marocain', drinkFr: 'Thé', qty: 1 },
+  { item: 'Breakfast Turk', drinkFr: "Jus d'orange", qty: 1 },
+  { item: 'Breakfast Turk 2 PERS', drinkFr: "Jus d'orange", qty: 2 },
+]
+
+/** The fixed drink for an item, or null if it doesn't come with one. */
+export function autoIncludedDrinkFor(itemName: string) {
+  const n = itemName.trim().toLowerCase()
+  return AUTO_INCLUDED_DRINKS.find((d) => d.item.toLowerCase() === n) ?? null
+}
 
 /** Items the BARMAN makes even though their menu category isn't a drinks
  * one (e.g. Mini Orange lives in Extras Breakfast). Matched on the item

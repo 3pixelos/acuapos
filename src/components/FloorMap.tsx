@@ -256,9 +256,14 @@ const Tile = memo(function Tile({
   const free = v.status === 'free'
   const late = v.status === 'late'
   const vip = v.table.vip
-  // Visual diversity by real table size, not just a uniform grid of boxes.
-  const wide = vip || v.table.seats >= 6
-  const compact = !vip && v.table.seats <= 2
+  // Shape first: a waiter finds a table by recognising it in the room, so a
+  // sofa bench should read as a bench and a round top as a circle. Tables
+  // with no shape set fall back to sizing by seat count, which is how the
+  // whole floor looked before shapes existed.
+  const shape = v.table.shape ?? null
+  const wide = shape === 'long' || (!shape && (vip || v.table.seats >= 6))
+  const round = shape === 'round'
+  const compact = !round && !wide && !vip && v.table.seats <= 2
 
   // long-press detection (join mode) — pointer events cover both touch & mouse
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -291,8 +296,12 @@ const Tile = memo(function Tile({
         onTap?.(v)
       }}
       aria-label={`${v.table.label} — ${t(meta.tkey)}`}
-      className={`relative flex select-none flex-col gap-1.5 overflow-hidden rounded-(--radius-card) border p-3 text-left shadow-(--shadow-1) transition-all duration-150 active:scale-[0.98] ${
+      className={`relative flex select-none flex-col gap-1.5 overflow-hidden border p-3 text-left shadow-(--shadow-1) transition-all duration-150 active:scale-[0.98] ${
         late ? 'late-pulse' : ''
+      } ${
+        round
+          ? 'aspect-square items-center justify-center rounded-full text-center'
+          : 'rounded-(--radius-card)'
       } ${wide ? 'col-span-2 min-h-[112px]' : compact ? 'min-h-[100px]' : 'min-h-[108px]'}`}
       style={{
         background: free ? 'var(--color-surface)' : meta.soft,

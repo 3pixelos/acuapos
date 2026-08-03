@@ -551,6 +551,7 @@ const dict = {
   chooseOption: ['Choisissez une option', 'Choose an option', 'Elige una opción'],
   // menu top-level groups. They double as the PRINT ROUTING: everything
   // under `food` prints in the kitchen, everything under `drinks` at the bar.
+  main_breakfast: ['Petit-déjeuner', 'Breakfast', 'Desayuno'],
   main_food: ['Cuisine', 'Kitchen', 'Cocina'],
   main_drinks: ['Bar', 'Bar', 'Barra'],
   branchSharedPrices: [

@@ -5,7 +5,7 @@
  */
 
 /** Category `main` groups that are real food (a "plat"). */
-export const FOOD_MAINS = ['food']
+export const FOOD_MAINS = ['breakfast', 'food']
 /** Food-ish categories that are add-ons, not standalone plats. Matched on
  * the category's French name, which is what an order line stores. */
 export const EXTRA_CATS_FR = ['Extras et accompagnements']

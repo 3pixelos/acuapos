@@ -61,7 +61,7 @@ import {
   type StationHealth,
   type TillRole,
 } from '../state/printer'
-import { stationsFor } from '../lib/kitchenPrintService'
+import { stationsFor, type Station } from '../lib/kitchenPrintService'
 import { money } from '../lib/format'
 import { todayKey } from '../lib/serviceDay'
 import { useI18n } from '../lib/i18n'
@@ -332,7 +332,7 @@ function PrinterStatus() {
       {/* only the stations THIS till is responsible for — the bar's till has
           no business showing a kitchen badge, and vice versa */}
       {stations.includes('kitchen') && chip(kitchenHealth, t('stationCuisine'))}
-      {stations.includes('bar') && chip(barHealth, t('stationBar'))}
+      {stations.includes('bar') && barPrinterName && chip(barHealth, t('stationBar'))}
     </span>
   )
 }
@@ -360,6 +360,7 @@ function WindowsPrinterPicker({
   value,
   onChange,
   placeholder,
+  station,
   printers,
   listErr,
   onRefresh,
@@ -372,12 +373,20 @@ function WindowsPrinterPicker({
   printers: string[]
   listErr: string
   onRefresh: () => void
+  /** Which badge this field drives, if any. The caisse printer has no badge
+   * of its own — its failures surface on the bill the cashier just tried to
+   * print — so it passes nothing. */
+  station?: Station
 }) {
   const t = useI18n((s) => s.t)
   // A value Windows doesn't know (typically an IP) means this station was
   // already set by hand — come back to the text box, not an empty dropdown.
   const [manual, setManual] = useState(Boolean(value) && !printers.includes(value))
   const fieldId = useId()
+  const setKitchenHealth = usePrinter((s) => s.setKitchenHealth)
+  const setBarHealth = usePrinter((s) => s.setBarHealth)
+  const setHealth = (st: Station, h: StationHealth) =>
+    st === 'kitchen' ? setKitchenHealth(h) : setBarHealth(h)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const paperWidth = usePrinter((s) => s.paperWidth)
@@ -388,8 +397,14 @@ function WindowsPrinterPicker({
     try {
       await sendToPrinter(value, buildTestTicket(label, columnsFor(paperWidth)))
       setTestResult({ ok: true, msg: t('printerTestOk') })
+      // A test is the strongest proof a station has — someone is standing at
+      // the printer watching it. Recording it is the whole point; leaving the
+      // badge on "non testée" after a test that visibly worked just made the
+      // badge look broken.
+      if (station) setHealth(station, 'ok')
     } catch (e) {
       setTestResult({ ok: false, msg: `${t('printerTestFailed')} — ${String(e)}` })
+      if (station) setHealth(station, 'down')
     } finally {
       setTesting(false)
     }
@@ -596,6 +611,7 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
           value={kname}
           onChange={setKname}
           placeholder="192.168.1.50"
+          station="kitchen"
           printers={printers}
           listErr={listErr}
           onRefresh={loadPrinters}
@@ -606,6 +622,7 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
           value={bname}
           onChange={setBname}
           placeholder="BAR-80"
+          station="bar"
           printers={printers}
           listErr={listErr}
           onRefresh={loadPrinters}
