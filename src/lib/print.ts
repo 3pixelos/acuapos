@@ -153,10 +153,9 @@ export interface BillMeta {
  * wordmark's own tagline. CP1252 covers both the É and the middot. */
 const TAGLINE = 'CAFÉ · RESTAURANT · LOUNGE'
 
-/** Contact block at the foot of a customer bill. No website line — there is
- * no website — and no invented address or tax number: a receipt is a legal
- * document in Spain, so a placeholder there would be worse than a gap.
- * TODO(client): add the fiscal details (NIF/CIF, address) when supplied. */
+/** Contact block at the foot of a customer bill. Deliberately just these
+ * two lines: there is no website, and the client does not want an address or
+ * fiscal number on the ticket (confirmed 2026-08-03). */
 const FOOTER = ['MERCI POUR VOTRE VISITE', 'INSTAGRAM: ACUA.BANUS']
 
 /** Sequential bill number for this till (T-1, T-2, …), device-local. */
