@@ -4,7 +4,6 @@ import {
   Package,
   Banknote,
   Calculator,
-  Check,
   CheckCircle2,
   ChefHat,
   CreditCard,
@@ -55,7 +54,8 @@ import {
 import type { BillStation } from '../lib/print'
 import { printBill, printFriendStatement } from '../lib/print'
 import { inTauri, listPrinters } from '../lib/tauri'
-import { usePrinter, type PaperWidth } from '../state/printer'
+import { usePrinter, type PaperWidth, type TillRole } from '../state/printer'
+import { stationsFor } from '../lib/kitchenPrintService'
 import { money } from '../lib/format'
 import { todayKey } from '../lib/serviceDay'
 import { useI18n } from '../lib/i18n'
@@ -289,8 +289,9 @@ export function CaisseHome() {
 /** Small badge telling the cashier whether kitchen tickets are printing —
  * the only screen anywhere near the kitchen printer. */
 function PrinterStatus() {
-  const { kitchenOnline, barOnline, printsKitchen, printsBar, queued } = usePrinter()
+  const { kitchenOnline, barOnline, barPrinterName, tillRole, queued } = usePrinter()
   const t = useI18n((s) => s.t)
+  const stations = stationsFor(tillRole, barPrinterName)
   if (!inTauri()) return null
   const chip = (ok: boolean, okLabel: string, downLabel: string) => (
     <span
@@ -306,8 +307,9 @@ function PrinterStatus() {
     <span className="inline-flex items-center gap-1.5">
       {/* only the stations THIS till is responsible for — the bar's till has
           no business showing a kitchen badge, and vice versa */}
-      {printsKitchen && chip(kitchenOnline, t('kitchenPrinterOk'), t('kitchenPrinterOffline'))}
-      {printsBar && chip(barOnline, t('barPrinterOk'), t('barPrinterOffline'))}
+      {stations.includes('kitchen') &&
+        chip(kitchenOnline, t('kitchenPrinterOk'), t('kitchenPrinterOffline'))}
+      {stations.includes('bar') && chip(barOnline, t('barPrinterOk'), t('barPrinterOffline'))}
     </span>
   )
 }
@@ -315,12 +317,19 @@ function PrinterStatus() {
 const PRINTER_FIELD =
   'min-h-12 w-full rounded-xl border border-line-2 bg-surface-2 px-3.5 outline-none focus:border-accent'
 
+/** Sentinel option that swaps the dropdown for a free-text box. */
+const MANUAL = '\u0000manual'
+
 /**
- * One Windows-printer picker. Both cable-connected printers (the caisse's
- * and the bar's) are chosen this way — they are addressed by the name
- * Windows knows them under, never by an IP. Enumeration can fail (or come
- * back empty on a machine with no printers installed yet), so the control
- * degrades to a free-text box rather than leaving the cashier stuck.
+ * One printer picker — all three stations use it, so the settings screen is
+ * the same question three times over: which printer is this one?
+ *
+ * It lists the printers Windows has installed. A station can also be given a
+ * bare IP (a network printer that was never installed as a Windows printer),
+ * which is what "Autre…" is for; `sendToPrinter` decides the transport from
+ * the value's shape. Enumeration can also fail outright, or come back empty
+ * on a machine with nothing installed, so the control degrades to the same
+ * free-text box rather than leaving the cashier stuck.
  */
 function WindowsPrinterPicker({
   label,
@@ -342,6 +351,9 @@ function WindowsPrinterPicker({
   onRefresh: () => void
 }) {
   const t = useI18n((s) => s.t)
+  // A value Windows doesn't know (typically an IP) means this station was
+  // already set by hand — come back to the text box, not an empty dropdown.
+  const [manual, setManual] = useState(Boolean(value) && !printers.includes(value))
   return (
     <label>
       <span className="mb-1 flex items-center justify-between text-xs font-bold text-ink-2">
@@ -355,8 +367,15 @@ function WindowsPrinterPicker({
         </button>
       </span>
       <p className="mb-1.5 text-[12px] text-ink-3">{hint}</p>
-      {printers.length > 0 ? (
-        <select className={PRINTER_FIELD} value={value} onChange={(e) => onChange(e.target.value)}>
+      {printers.length > 0 && !manual ? (
+        <select
+          className={PRINTER_FIELD}
+          value={value}
+          onChange={(e) => {
+            if (e.target.value === MANUAL) return setManual(true)
+            onChange(e.target.value)
+          }}
+        >
           <option value="">—</option>
           {/* keep a previously saved printer selectable even if it is
               currently offline / not enumerated */}
@@ -366,77 +385,94 @@ function WindowsPrinterPicker({
               {name}
             </option>
           ))}
+          <option value={MANUAL}>{t('printerManualOption')}</option>
         </select>
       ) : (
-        // list empty or enumeration failed — type the exact Windows name
+        // chosen "Autre…", or the list is empty / enumeration failed — type
+        // the exact Windows name, or an IP for a network printer
         <>
           <input
             className={PRINTER_FIELD}
             value={value}
             placeholder={placeholder}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => onChange(e.target.value.trim())}
           />
-          <p className="mt-1 text-[12px] font-semibold text-amber-700">
-            {t('printerListEmptyHint')}
-          </p>
-          {listErr && <p className="mt-1 text-[11px] text-danger">{listErr}</p>}
+          {printers.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setManual(false)}
+              className="mt-1 text-[12px] font-semibold text-accent underline"
+            >
+              {t('printerBackToList')}
+            </button>
+          ) : (
+            <>
+              <p className="mt-1 text-[12px] font-semibold text-amber-700">
+                {t('printerListEmptyHint')}
+              </p>
+              {listErr && <p className="mt-1 text-[11px] text-danger">{listErr}</p>}
+            </>
+          )}
         </>
       )}
     </label>
   )
 }
 
-/** One station on/off row in the printer settings. */
-function StationToggle({
-  label,
-  hint,
-  on,
-  onChange,
-}: {
-  label: string
-  hint: string
-  on: boolean
-  onChange: (v: boolean) => void
-}) {
+/**
+ * Which till this machine is. One choice, and everything else follows: the
+ * main caisse prints the food tickets and every bill except the Bar floor's;
+ * the bar's till prints the drink tickets and the Bar floor's bills.
+ *
+ * It exists because both machines watch the same ticket queue. Without it
+ * each would print the other's tickets too.
+ */
+function TillRolePicker({ value, onChange }: { value: TillRole; onChange: (r: TillRole) => void }) {
+  const t = useI18n((s) => s.t)
+  const opts: { id: TillRole; label: string; hint: string }[] = [
+    { id: 'main', label: t('tillRoleMain'), hint: t('tillRoleMainHint') },
+    { id: 'bar', label: t('tillRoleBar'), hint: t('tillRoleBarHint') },
+  ]
   return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
-        on ? 'border-accent bg-accent/5' : 'border-line-2 bg-surface-2'
-      }`}
-    >
-      <span
-        className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-2 ${
-          on ? 'border-accent bg-accent text-white' : 'border-line-2'
-        }`}
-      >
-        {on && <Check size={13} strokeWidth={3} />}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13.5px] font-bold">{label}</span>
-        <span className="mt-0.5 block text-[12px] text-ink-3">{hint}</span>
-      </span>
-    </button>
+    <div>
+      <span className="mb-1 block text-xs font-bold text-ink-2">{t('tillRoleTitle')}</span>
+      <p className="mb-2 text-[12px] text-ink-3">{t('tillRoleHint')}</p>
+      <div className="flex flex-col gap-2">
+        {opts.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
+              value === o.id ? 'border-accent bg-accent/5' : 'border-line-2 bg-surface-2'
+            }`}
+          >
+            <span
+              className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${
+                value === o.id ? 'border-accent' : 'border-line-2'
+              }`}
+            >
+              {value === o.id && <span className="size-2.5 rounded-full bg-accent" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13.5px] font-bold">{o.label}</span>
+              <span className="mt-0.5 block text-[12px] text-ink-3">{o.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
 function PrinterSettings({ onClose }: { onClose: () => void }) {
-  const {
-    kitchenIp,
-    barPrinterName,
-    cashierPrinterName,
-    printsKitchen,
-    printsBar,
-    paperWidth,
-    setConfig,
-  } = usePrinter()
+  const { kitchenPrinterName, barPrinterName, cashierPrinterName, tillRole, paperWidth, setConfig } =
+    usePrinter()
   const t = useI18n((s) => s.t)
-  const [kip, setKip] = useState(kitchenIp)
+  const [kname, setKname] = useState(kitchenPrinterName)
   const [bname, setBname] = useState(barPrinterName)
   const [cname, setCname] = useState(cashierPrinterName)
-  const [doKitchen, setDoKitchen] = useState(printsKitchen)
-  const [doBar, setDoBar] = useState(printsBar)
+  const [role, setRole] = useState<TillRole>(tillRole)
   const [pw, setPw] = useState<PaperWidth>(paperWidth)
   const [printers, setPrinters] = useState<string[]>([])
   const [listErr, setListErr] = useState('')
@@ -463,47 +499,21 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
       </h2>
       <p className="mt-1 text-[13px] text-ink-3">{t('printerSettingsHint')}</p>
       <div className="mt-4 flex flex-col gap-3">
-        {/* Which stations THIS machine prints. The main caisse and the bar's
-            caisse both run this app against the same ticket queue, so each
-            has to take a different half or every ticket prints twice. */}
-        <div>
-          <span className="mb-1 block text-xs font-bold text-ink-2">{t('stationsTitle')}</span>
-          <p className="mb-2 text-[12px] text-ink-3">{t('stationsHint')}</p>
-          <div className="flex flex-col gap-2">
-            <StationToggle
-              label={t('stationKitchen')}
-              hint={t('stationKitchenHint')}
-              on={doKitchen}
-              onChange={setDoKitchen}
-            />
-            <StationToggle
-              label={t('stationBar')}
-              hint={t('stationBarHint')}
-              on={doBar}
-              onChange={setDoBar}
-            />
-          </div>
-          {!doKitchen && !doBar && (
-            <p className="mt-2 text-[12px] font-semibold text-amber-700">{t('stationsNoneWarn')}</p>
-          )}
-        </div>
+        <TillRolePicker value={role} onChange={setRole} />
 
-        {/* The kitchen printer is the ONLY networked one — it keeps an IP. */}
-        {doKitchen && (
-          <label>
-            <span className="mb-1 block text-xs font-bold text-ink-2">{t('kitchenPrinterIp')}</span>
-            <p className="mb-1.5 text-[12px] text-ink-3">{t('kitchenPrinterIpHint')}</p>
-            <input
-              className={PRINTER_FIELD}
-              value={kip}
-              inputMode="decimal"
-              placeholder="192.168.1.50"
-              onChange={(e) => setKip(e.target.value.trim())}
-            />
-          </label>
-        )}
-        {/* The bar printer stays configurable even on a till that doesn't
-            print bar TICKETS — a Bar-floor addition still comes out of it. */}
+        {/* All three stations are the same question. Every field stays
+            visible on both tills: even the bar's till can be asked to print
+            a Salon bill, and the main till a Bar-floor one. */}
+        <WindowsPrinterPicker
+          label={t('kitchenPrinterName')}
+          hint={t('kitchenPrinterNameHint')}
+          value={kname}
+          onChange={setKname}
+          placeholder="192.168.1.50"
+          printers={printers}
+          listErr={listErr}
+          onRefresh={loadPrinters}
+        />
         <WindowsPrinterPicker
           label={t('barPrinterName')}
           hint={t('barPrinterNameHint')}
@@ -549,11 +559,10 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
             className="flex-1"
             onClick={() => {
               setConfig({
-                kitchenIp: kip,
+                kitchenPrinterName: kname,
                 barPrinterName: bname,
                 cashierPrinterName: cname,
-                printsKitchen: doKitchen,
-                printsBar: doBar,
+                tillRole: role,
                 paperWidth: pw,
               })
               onClose()

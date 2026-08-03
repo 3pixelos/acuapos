@@ -2,18 +2,25 @@
 
 ## The three printers
 
-Acua runs **three** printers, and they are not reached the same way:
+Acua runs **three** printers:
 
-| Printer | Connection | What it prints |
-| --- | --- | --- |
-| **Kitchen** | **Network** — raw TCP `ip:9100` | Food tickets only (everything in a `food` menu category) |
-| **Bar** | **Cable** — a Windows printer, picked by name | Drink tickets (`drinks` categories) **and** the addition of any table on the **Bar** floor |
-| **Caisse** | **Cable** — a Windows printer, picked by name | The full customer bills, friend statements, the fin-de-journée |
+| Printer | What it prints |
+| --- | --- |
+| **Kitchen** | Food tickets — everything in a `food` menu category |
+| **Bar** | Drink tickets (`drinks` categories) **and** the bill of any table on the **Bar** floor |
+| **Caisse** | The full customer bills for every other floor, friend statements, the fin-de-journée |
 
-The kitchen printer is the only one with an IP. The bar and the caisse
-printers are both cabled, so the app addresses them by the name Windows knows
-them under and prints through the Windows spooler — that is why both are a
-**dropdown** in the settings, not a text field.
+All three are configured identically: one dropdown of the printers Windows
+has installed. A printer can also be given a **bare IP** — pick *Autre…* and
+type it — for a networked printer that was never installed as a Windows
+printer. The app decides the transport from the value's shape (`sendToPrinter`
+in `src/lib/tauri.ts`): an IP goes over raw TCP `:9100`, anything else through
+the Windows spooler. The settings screen never asks which is which.
+
+**Nothing configures what prints where.** It follows from the menu: an item in
+a category whose `main` is `food` prints at the kitchen, `drinks` at the bar.
+Change a category's `main` and its routing follows. The single exception is
+the bill of a table on the Bar floor, which comes out of the bar printer.
 
 The bar printer is plugged into the **bar's own till**, which therefore has to
 be powered on for anything to come out of it.
@@ -22,28 +29,32 @@ be powered on for anything to come out of it.
 
 The desktop app runs on **both** the main caisse and the bar's caisse. They
 watch the *same* `order_items` queue, so each install has to be told **which
-stations it is responsible for** — otherwise both would print every ticket and
-the kitchen would get two copies of every dish.
+one it is** — otherwise both would print every ticket and the kitchen would
+get two copies of every dish.
 
-Printer settings → **“Cette caisse imprime”**:
+Printer settings → **“Cette caisse est”**. One choice per machine, and
+everything follows from it:
 
-| | Kitchen tickets | Bar tickets |
+| This till is | Prints these tickets | Prints these bills |
 | --- | --- | --- |
-| **Main caisse** | ✅ | ☐ |
-| **Bar caisse** | ☐ | ✅ |
+| **La caisse principale** | food | every floor except the Bar |
+| **La caisse du bar** | drinks | the Bar floor's tables |
 
-A till skips tickets for stations it doesn't own — it doesn't print them and,
+A till skips tickets for the other one's station — it doesn't print them and,
 crucially, doesn't stamp `printed_at` on them, so the other till still picks
 them up. The status badges follow the same rule: the bar till shows no kitchen
 badge and vice versa.
 
-> **The two tills must not tick the same station.** Nothing enforces this — a
-> till has no way to read the other one's settings — so if you ever see every
-> ticket printing twice, that's the cause.
+Because there is one setting with two values rather than two independent
+checkboxes, the two tills **cannot** both claim the same station. That whole
+class of double-printing is gone.
 
-Bills are unaffected by these toggles: either till can settle any table.
-A **Bar-floor** table's addition goes to the bar printer, everything else to
-that machine's caisse printer, so the bar printer stays configurable on both.
+Bills are routed by the **table's floor**, not by which till you press the
+button on, so keep all three printers filled in on both machines: the bar's
+till can be asked to settle a Salon table, and the main till a Bar one.
+
+**Running only one till?** Leave it on *La caisse principale* and set no bar
+printer — drinks then print at the kitchen.
 
 ## How printing works
 
@@ -79,10 +90,10 @@ Do this **on each of the two tills** — the settings are per-device.
 1. Install the app (the `.exe` from the GitHub build — see below).
 2. Open it, go to the **Caisse** screen, click the **⚙ (Imprimantes)** button
    top-right, and set:
-   - **Cette caisse imprime** — tick *Kitchen tickets* on the main till,
-     *Bar tickets* on the bar till. Never the same one on both.
-   - **Kitchen printer IP** (e.g. `192.168.1.50`) — only shown when this till
-     prints kitchen tickets
+   - **Cette caisse est** — *La caisse principale* on one machine, *La caisse
+     du bar* on the other.
+   - **Kitchen printer** — pick it from the Windows list, or *Autre…* and type
+     its IP (e.g. `192.168.1.50`) if it is on the network
    - **Bar printer** — pick it from the Windows list
    - **Cashier printer** — pick it from the Windows list
    - **Paper width** (80 mm or 58 mm)
@@ -95,16 +106,18 @@ If the dropdown comes up empty, Windows printer enumeration failed — the field
 falls back to free text and you type the printer's **exact** Windows name
 (Windows Settings › Printers & scanners).
 
-## Network setup (kitchen printer only)
+## Network setup (only if a printer is addressed by IP)
 
-The kitchen printer needs a **stable IP** — either a static IP set in the
-printer's own network menu, or a DHCP reservation on the router keyed to its
-MAC address. Otherwise the IP can change after a router reboot and the app's
-configured IP goes stale. This is identical for Wi‑Fi and Ethernet — only the
-physical connection differs, not the config or the code.
+A printer given an IP rather than a Windows name needs a **stable** one —
+either a static IP set in the printer's own network menu, or a DHCP
+reservation on the router keyed to its MAC address. Otherwise the IP changes
+after a router reboot and the configured value goes stale. This is identical
+for Wi‑Fi and Ethernet — only the physical connection differs.
 
 It must expose **raw TCP on port 9100** (JetDirect/AppSocket). Epson
-TM-series, Xprinter, Star, etc. all do this by default.
+TM-series, Xprinter, Star, etc. all do this by default. Installing it as a
+Windows printer instead sidesteps all of this — then it is just another name
+in the dropdown.
 
 ## Client expectation (important)
 

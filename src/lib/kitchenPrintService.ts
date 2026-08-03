@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { supabase } from './supabase'
 import { buildKitchenTicket } from './print'
-import { inTauri, printEscPos, printEscPosUsb } from './tauri'
-import { usePrinter, columnsFor } from '../state/printer'
+import { inTauri, sendToPrinter } from './tauri'
+import { usePrinter, columnsFor, type TillRole } from '../state/printer'
 import { deviceBranch } from '../state/auth'
 import { BAR_ROUTED_ITEM_NAMES, INCLUDED_DRINK_CATEGORY, type OrderItem } from './types'
 
@@ -12,62 +12,43 @@ import { BAR_ROUTED_ITEM_NAMES, INCLUDED_DRINK_CATEGORY, type OrderItem } from '
  * nothing anyone opens. It watches order_items for sent-but-unprinted
  * tickets and streams each to the right printer.
  *
- * Two stations: every ticket is split by the item's MAIN category — drinks
- * go to the BAR printer, everything else to the KITCHEN printer, each as
- * its own receipt. The caisse bill is untouched; the split only exists at
- * ordering time.
+ * Two stations, and NOTHING configures which is which: every ticket is split
+ * by the item's MAIN menu category — `drinks` goes to the BAR printer,
+ * everything else to the KITCHEN printer, each as its own receipt. Change a
+ * category's `main` in the menu and its routing follows. The caisse bill is
+ * untouched; the split only exists at ordering time.
  *
- * The two stations are reached DIFFERENTLY. The kitchen printer is the only
- * one on the network (raw TCP :9100). The bar printer is cabled to the bar's
- * own till, so it is addressed by its Windows printer NAME through the
- * spooler — the same route the cashier printer uses. If no bar printer has
- * been picked yet, drinks fall back to the kitchen rather than queueing
- * forever on a station that isn't set up.
+ * Both are addressed the same way, by whatever the settings hold — a Windows
+ * printer name or an IP (see `sendToPrinter`). If no bar printer has been
+ * picked yet, drinks fall back to the kitchen rather than queueing forever
+ * on a station that isn't set up.
  *
  * Each sub-ticket succeeds or fails on its own: rows are marked
  * `printed_at` ONLY after their own write is confirmed, so the bar being
  * offline queues the drinks while the food still prints (and vice versa) —
  * everything flushes automatically once the printer is back.
+ *
+ * TWO TILLS SHARE THIS QUEUE — the main caisse and the bar's. Each claims
+ * only the stations its `tillRole` says it serves (see `stationsFor`) and
+ * leaves the rest alone, so nothing prints twice and nothing goes missing.
  */
 
 export type Station = 'kitchen' | 'bar'
 
-/** The printer config a station plan is decided from. */
-export interface StationConfig {
-  kitchenIp: string
-  barPrinterName: string
-  printsKitchen: boolean
-  printsBar: boolean
-}
-
-export interface StationPlan {
-  /** Does this machine take tickets for that station at all? */
-  owns: (s: Station) => boolean
-  /** Owns it AND has somewhere to send it. */
-  canPrint: (s: Station) => boolean
-  /** True on a single-till setup with no bar printer: drinks come out of the
-   * kitchen printer. Never true on a machine that serves only the bar — there
-   * it would push drinks onto a printer this till isn't responsible for. */
-  barFallsBackToKitchen: boolean
-  /** Nothing to do — this machine prints no order tickets. */
-  idle: boolean
-}
-
 /**
- * Which stations this machine takes off the shared queue, and whether it can
- * actually print them. Pure, and separated out because it is the one piece of
- * logic that decides whether the two tills cooperate or fight: a till must
- * leave the other's tickets completely alone — unprinted AND unstamped.
+ * Which stations a till claims off the shared queue.
+ *
+ * The main caisse takes the food; the bar's takes the drinks. The main
+ * caisse ALSO takes the drinks when no bar printer is configured on it —
+ * that is the one-till setup, where drinks print at the kitchen instead of
+ * queueing forever against a station nobody serves.
+ *
+ * Pure and exported because this is the piece that decides whether two tills
+ * cooperate or double-print everything.
  */
-export function planStations(cfg: StationConfig): StationPlan {
-  const { kitchenIp, barPrinterName, printsKitchen, printsBar } = cfg
-  const owns = (s: Station) => (s === 'bar' ? printsBar : printsKitchen)
-  const barFallsBackToKitchen = printsBar && printsKitchen && !barPrinterName && Boolean(kitchenIp)
-  const canPrint = (s: Station) =>
-    s === 'bar'
-      ? printsBar && (Boolean(barPrinterName) || barFallsBackToKitchen)
-      : printsKitchen && Boolean(kitchenIp)
-  return { owns, canPrint, barFallsBackToKitchen, idle: !printsKitchen && !printsBar }
+export function stationsFor(role: TillRole, barPrinterName: string): Station[] {
+  if (role === 'bar') return ['bar']
+  return barPrinterName ? ['kitchen'] : ['kitchen', 'bar']
 }
 
 export function useKitchenPrintService() {
@@ -166,18 +147,22 @@ export function useKitchenPrintService() {
 
           await loadMenuRouting()
 
-          const { kitchenIp, barPrinterName, printsKitchen, printsBar, paperWidth } =
+          const { kitchenPrinterName, barPrinterName, tillRole, paperWidth } =
             usePrinter.getState()
 
-          // STATION OWNERSHIP. Both tills — the main caisse and the bar's —
-          // run this service against the same queue. Each only takes the
-          // stations it was told it serves, and leaves the rest untouched
-          // (not printed, not stamped) for the other machine to collect.
-          // Without this every ticket would print twice, once per till.
-          const plan = planStations({ kitchenIp, barPrinterName, printsKitchen, printsBar })
-          if (plan.idle) break // this machine prints no order tickets at all
+          // STATION OWNERSHIP, from the one thing the cashier picked: is this
+          // the main caisse or the bar's? Both tills run this service against
+          // the same queue, so each takes only its own station and leaves the
+          // rest untouched — not printed, and above all NOT stamped
+          // `printed_at` — for the other machine to collect. Without this
+          // every ticket prints twice, once per till.
+          //
+          // The main caisse also covers the bar when no bar printer is set,
+          // which is the one-till setup: drinks come out at the kitchen
+          // rather than queueing forever against a station nobody serves.
+          const plan = stationsFor(tillRole, barPrinterName)
 
-          const items = queue.filter((i) => plan.owns(stationOf(i)))
+          const items = queue.filter((i) => plan.includes(stationOf(i)))
           if (!items.length) {
             // Everything queued belongs to the other till. Nothing is wrong
             // here, so report idle rather than a phantom backlog.
@@ -186,21 +171,23 @@ export function useKitchenPrintService() {
           }
           usePrinter.getState().setQueued(ticketCount(items))
 
-          // A station this machine owns but has no printer for can't proceed;
-          // surface it and stop rather than spinning.
-          if (printsKitchen && !plan.canPrint('kitchen')) {
-            usePrinter.getState().setKitchenOnline(false)
-            break
+          // Where each station's tickets actually go on THIS machine. The bar
+          // falls back to the kitchen printer only on a till that serves both.
+          const targetFor: Record<Station, string> = {
+            kitchen: kitchenPrinterName,
+            bar: barPrinterName || (plan.includes('kitchen') ? kitchenPrinterName : ''),
           }
-          if (printsBar && !plan.canPrint('bar')) {
-            usePrinter.getState().setBarOnline(false)
+          // A station this machine serves but has no printer for can't
+          // proceed; surface it and stop rather than spinning.
+          const unset = plan.find((s) => !targetFor[s])
+          if (unset) {
+            if (unset === 'kitchen') usePrinter.getState().setKitchenOnline(false)
+            else usePrinter.getState().setBarOnline(false)
             break
           }
           const cols = columnsFor(paperWidth)
           const sendTo = (station: Station, bytes: Uint8Array) =>
-            station === 'bar' && barPrinterName
-              ? printEscPosUsb(barPrinterName, bytes)
-              : printEscPos(kitchenIp, bytes)
+            sendToPrinter(targetFor[station], bytes)
           const headerFor: Record<Station, 'CUISINE' | 'BAR'> = {
             kitchen: 'CUISINE',
             bar: 'BAR',
@@ -269,13 +256,13 @@ export function useKitchenPrintService() {
           // A station this machine doesn't serve is reported OK — its badge
           // is hidden anyway, and "offline" would be a lie about a printer
           // this till was never asked to reach.
-          usePrinter.getState().setKitchenOnline(!printsKitchen || !stationDown.kitchen)
+          usePrinter.getState().setKitchenOnline(!plan.includes('kitchen') || !stationDown.kitchen)
           // When the bar falls back to the kitchen printer it shares that
           // printer's status — that's where its tickets actually went.
           usePrinter
             .getState()
             .setBarOnline(
-              !printsBar || !(barPrinterName ? stationDown.bar : stationDown.kitchen),
+              !plan.includes('bar') || !(barPrinterName ? stationDown.bar : stationDown.kitchen),
             )
           if (stationDown.kitchen || stationDown.bar) break
         }

@@ -167,49 +167,42 @@ const dict = {
   kitchenPrinterOffline: ['Cuisine hors ligne', 'Kitchen offline', 'Cocina sin conexión'],
   printerSettings: ['Imprimantes', 'Printers', 'Impresoras'],
   printerSettingsHint: [
-    'Cuisine : imprimante réseau (port 9100). Bar et caisse : imprimantes Windows branchées par câble. Configurées sur cet appareil.',
-    'Kitchen: network printer (port 9100). Bar and cashier: cable-connected Windows printers. Stored on this device.',
-    'Cocina: impresora de red (puerto 9100). Barra y caja: impresoras de Windows conectadas por cable. Se guardan en este dispositivo.',
+    'Ce qui s’imprime où suit la carte : les catégories « Cuisine » partent en cuisine, « Bar » au bar. Réglages propres à cet appareil.',
+    'What prints where follows the menu: "Kitchen" categories go to the kitchen, "Bar" ones to the bar. Settings are per device.',
+    'Lo que se imprime dónde sigue la carta: las categorías «Cocina» van a cocina y las de «Barra» a la barra. Ajustes propios de este dispositivo.',
   ],
-  // which stations this machine is responsible for (two tills run the app)
-  stationsTitle: [
-    'Cette caisse imprime',
-    'This till prints',
-    'Esta caja imprime',
+  // which till this machine is (two tills share one ticket queue)
+  tillRoleTitle: ['Cette caisse est', 'This till is', 'Esta caja es'],
+  tillRoleHint: [
+    'Les deux caisses lisent la même file de tickets — ce choix décide lesquels celle-ci imprime, pour qu’aucun ticket ne sorte en double.',
+    'Both tills read the same ticket queue — this decides which ones this one prints, so no ticket comes out twice.',
+    'Las dos cajas leen la misma cola de tickets — esto decide cuáles imprime esta, para que ningún ticket salga por duplicado.',
   ],
-  stationsHint: [
-    'Les deux caisses lisent la même file de tickets. Chacune doit cocher SES postes uniquement — si les deux cochent le même, chaque ticket sort en double.',
-    'Both tills read the same ticket queue. Each must tick ONLY its own stations — if both tick the same one, every ticket prints twice.',
-    'Las dos cajas leen la misma cola de tickets. Cada una debe marcar SOLO sus puestos — si ambas marcan el mismo, cada ticket se imprime dos veces.',
+  tillRoleMain: ['La caisse principale', 'The main till', 'La caja principal'],
+  tillRoleMainHint: [
+    'Imprime les tickets cuisine, et toutes les additions sauf celles du Bar.',
+    'Prints the kitchen tickets, and every bill except the Bar floor’s.',
+    'Imprime los tickets de cocina y todas las cuentas salvo las de la Barra.',
   ],
-  stationKitchen: ['Tickets cuisine', 'Kitchen tickets', 'Tickets de cocina'],
-  stationKitchenHint: [
-    'Les plats. À cocher sur la caisse principale.',
-    'The food items. Tick this on the main till.',
-    'Los platos. Márcalo en la caja principal.',
+  tillRoleBar: ['La caisse du bar', 'The bar’s till', 'La caja de la barra'],
+  tillRoleBarHint: [
+    'Imprime les tickets bar, et les additions des tables du Bar.',
+    'Prints the bar tickets, and the bills of the Bar floor’s tables.',
+    'Imprime los tickets de barra y las cuentas de las mesas de la Barra.',
   ],
-  stationBar: ['Tickets bar', 'Bar tickets', 'Tickets de barra'],
-  stationBarHint: [
-    'Les boissons. À cocher sur la caisse du bar.',
-    'The drinks. Tick this on the bar’s till.',
-    'Las bebidas. Márcalo en la caja de la barra.',
-  ],
-  stationsNoneWarn: [
-    'Aucun poste coché — cette caisse n’imprimera aucun ticket de commande (les additions fonctionnent toujours).',
-    'No station ticked — this till will print no order tickets at all (bills still work).',
-    'Ningún puesto marcado — esta caja no imprimirá ningún ticket de pedido (las cuentas siguen funcionando).',
-  ],
-  kitchenPrinterIp: ['IP imprimante cuisine', 'Kitchen printer IP', 'IP de la impresora de cocina'],
-  kitchenPrinterIpHint: [
-    'Seule imprimante en réseau. Elle ne reçoit que les plats.',
-    'The only networked printer. It receives food items only.',
-    'La única impresora en red. Solo recibe los platos.',
+  printerManualOption: ['Autre… (saisir un nom ou une IP)', 'Other… (type a name or IP)', 'Otra… (escribir nombre o IP)'],
+  printerBackToList: ['← Revenir à la liste', '← Back to the list', '← Volver a la lista'],
+  kitchenPrinterName: ['Imprimante cuisine', 'Kitchen printer', 'Impresora de cocina'],
+  kitchenPrinterNameHint: [
+    'Elle ne reçoit que les plats. Choisissez-la dans la liste Windows, ou « Autre… » pour saisir son IP si elle est en réseau.',
+    'It receives food items only. Pick it from the Windows list, or "Other…" to type its IP if it is on the network.',
+    'Solo recibe los platos. Elígela en la lista de Windows, o «Otra…» para escribir su IP si está en red.',
   ],
   barPrinterName: ['Imprimante bar', 'Bar printer', 'Impresora de la barra'],
   barPrinterNameHint: [
-    'Imprimante reliée par câble à la caisse du bar. Elle reçoit les boissons et les additions du bar. Vide = tout part en cuisine.',
-    'Printer cabled to the bar till. It receives the drinks and the bar’s own bills. Empty = everything goes to the kitchen.',
-    'Impresora conectada por cable a la caja de la barra. Recibe las bebidas y las cuentas de la barra. Vacío = todo va a cocina.',
+    'Elle reçoit les boissons et les additions des tables du Bar. Vide = tout part en cuisine.',
+    'It receives the drinks and the bills of the Bar floor’s tables. Empty = everything goes to the kitchen.',
+    'Recibe las bebidas y las cuentas de las mesas de la Barra. Vacío = todo va a cocina.',
   ],
   barPrinterOk: ['Bar OK', 'Bar OK', 'Barra OK'],
   barPrinterOffline: ['Bar hors ligne', 'Bar offline', 'Barra sin conexión'],
@@ -221,9 +214,9 @@ const dict = {
     'Lista de Windows no disponible — escribe el nombre EXACTO de la impresora (Configuración de Windows › Impresoras y escáneres).',
   ],
   cashierPrinterNameHint: [
-    'Imprimante branchée par câble sur ce PC — choisissez-la dans la liste Windows. Elle imprime les additions complètes.',
-    'Printer cabled to this PC — pick it from the Windows list. It prints the full bills.',
-    'Impresora conectada por cable a este PC — elígela en la lista de Windows. Imprime las cuentas completas.',
+    'Elle imprime les additions complètes de toutes les salles sauf le Bar.',
+    'It prints the full bills for every floor except the Bar.',
+    'Imprime las cuentas completas de todas las salas salvo la Barra.',
   ],
   paperWidth: ['Largeur du papier', 'Paper width', 'Ancho del papel'],
   // layers

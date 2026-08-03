@@ -2,7 +2,7 @@ import type { OrderItem, Payment } from './types'
 import { INCLUDED_DRINK_CATEGORY } from './types'
 import { money } from './format'
 import { EscPos, lr } from './escpos'
-import { inTauri, printEscPosUsb } from './tauri'
+import { inTauri, sendToPrinter } from './tauri'
 import { usePrinter, columnsFor } from '../state/printer'
 import {
   RECEIPT_LOGO_HEIGHT,
@@ -249,7 +249,7 @@ export function buildFriendStatement(d: FriendStatementData, cols = 42): Uint8Ar
 export async function printFriendStatement(d: FriendStatementData): Promise<void> {
   const { cashierPrinterName, paperWidth } = usePrinter.getState()
   if (inTauri() && cashierPrinterName) {
-    await printEscPosUsb(cashierPrinterName, buildFriendStatement(d, columnsFor(paperWidth)))
+    await sendToPrinter(cashierPrinterName, buildFriendStatement(d, columnsFor(paperWidth)))
     return
   }
   printFriendStatementHtml(d)
@@ -424,7 +424,7 @@ export async function printSalesReport(d: SalesReportData): Promise<void> {
   const { cashierPrinterName, paperWidth } = usePrinter.getState()
   const cols = columnsFor(paperWidth)
   if (inTauri() && cashierPrinterName) {
-    await printEscPosUsb(cashierPrinterName, buildSalesReport(d, cols))
+    await sendToPrinter(cashierPrinterName, buildSalesReport(d, cols))
     return
   }
   printSalesReportHtml(d)
@@ -514,7 +514,7 @@ export async function printBill(
   const { cashierPrinterName, barPrinterName, paperWidth } = usePrinter.getState()
   const target = station === 'bar' ? barPrinterName || cashierPrinterName : cashierPrinterName
   if (inTauri() && target) {
-    await printEscPosUsb(target, buildBill(tableRef, items, meta, columnsFor(paperWidth)))
+    await sendToPrinter(target, buildBill(tableRef, items, meta, columnsFor(paperWidth)))
     return stripped
   }
   printBillHtml(tableRef, items, meta)
