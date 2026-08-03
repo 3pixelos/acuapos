@@ -98,13 +98,44 @@ Do this **on each of the two tills** — the settings are per-device.
    - **Cashier printer** — pick it from the Windows list
    - **Paper width** (80 mm or 58 mm)
    These are stored on that device.
-3. Badges show **“Cuisine OK”** / **“Bar OK”** (green) or the offline variant
-   (red, with the number of queued tickets) so staff can see at a glance
-   whether printing is flowing.
+3. Hit **Tester** next to each printer. A short TEST ticket should come out
+   of that exact machine — this is the only way to confirm you picked the
+   right one, and it is worth doing before service rather than discovering it
+   on the first order.
 
-If the dropdown comes up empty, Windows printer enumeration failed — the field
-falls back to free text and you type the printer's **exact** Windows name
-(Windows Settings › Printers & scanners).
+### Reading the status badges
+
+They report what is **known**, never more:
+
+| Badge | Means |
+| --- | --- |
+| `Cuisine non configurée` (amber) | no printer chosen for that station |
+| `Cuisine non testée` (amber) | chosen, but nothing has been sent to it yet |
+| `Cuisine OK` (green) | a ticket really came out of it |
+| `Cuisine hors ligne` (red) | the last attempt failed; tickets are queued |
+
+**Green does not appear until something has actually printed.** It used to
+show `OK` from the moment the app started, including on a till with no
+printer configured at all — which was exactly backwards, since the badge is
+read most while setting up.
+
+### If a name in the dropdown looks unfamiliar
+
+The list is whatever Windows reports (`EnumPrinters`) — nothing is hardcoded.
+Two things to know:
+
+- Every stock Windows has virtual printers you don't own: *Microsoft Print to
+  PDF*, *Microsoft XPS Document Writer*, sometimes *Fax* or *OneNote*.
+- A printer previously saved in these settings that Windows is **no longer**
+  reporting still appears, tagged `— non détectée par Windows`, so an offline
+  printer isn't silently dropped. If a name carries that tag, Windows does not
+  currently see it.
+
+Cross-check against Windows Settings › Printers & scanners, and use **Tester**
+to settle it.
+
+If the dropdown comes up empty, enumeration failed altogether — the field
+falls back to free text and you type the printer's **exact** Windows name.
 
 ## Network setup (only if a printer is addressed by IP)
 

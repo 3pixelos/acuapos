@@ -99,6 +99,29 @@ export function buildKitchenTicket(opts: {
   return p.bytes()
 }
 
+/**
+ * A short ticket the cashier can fire at any printer from the settings
+ * screen. The status badges can only report on tickets that happened to be
+ * queued, which is no use while setting a printer up — this is the one way
+ * to answer "is this actually the right printer, and is it reachable?"
+ * without waiting for a real order.
+ */
+export function buildTestTicket(station: string, cols = 42): Uint8Array {
+  const p = new EscPos()
+  p.align('center')
+  p.invert(true).bold(true).size(1, 1).line('  TEST  ').size(0, 0).bold(false).invert(false)
+  p.feed(1).bold(true).size(0, 1).line(station.toUpperCase()).size(0, 0).bold(false)
+  p.line('ACUA POS')
+  p.feed(1).align('left').rule(cols)
+  p.line('Si vous lisez ceci, cette')
+  p.line('imprimante est la bonne et')
+  p.line('elle repond.')
+  p.rule(cols)
+  p.align('center').line(stamp()).align('left')
+  p.feed(1).cut()
+  return p.bytes()
+}
+
 /** Everything the customer bill shows besides the item lines. */
 export interface BillMeta {
   /** Cashier's display name (CAISSIER line). */

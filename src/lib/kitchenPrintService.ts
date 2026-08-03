@@ -139,9 +139,9 @@ export function useKitchenPrintService() {
             .order('created_at')
           const queue = (data ?? []) as unknown as OrderItem[]
           if (!queue.length) {
+            // Nothing to print says nothing about whether the printers work,
+            // so the health flags are deliberately left alone here.
             usePrinter.getState().setQueued(0)
-            usePrinter.getState().setKitchenOnline(true)
-            usePrinter.getState().setBarOnline(true)
             break
           }
 
@@ -179,10 +179,10 @@ export function useKitchenPrintService() {
           }
           // A station this machine serves but has no printer for can't
           // proceed; surface it and stop rather than spinning.
-          const unset = plan.find((s) => !targetFor[s])
-          if (unset) {
-            if (unset === 'kitchen') usePrinter.getState().setKitchenOnline(false)
-            else usePrinter.getState().setBarOnline(false)
+          const missing = plan.find((s) => !targetFor[s])
+          if (missing) {
+            if (missing === 'kitchen') usePrinter.getState().setKitchenHealth('unset')
+            else usePrinter.getState().setBarHealth('unset')
             break
           }
           const cols = columnsFor(paperWidth)
@@ -226,9 +226,11 @@ export function useKitchenPrintService() {
           // stations failed this pass and skip their remaining sub-tickets
           // (no point stacking 4-second timeouts against a dead printer).
           const stationDown: Record<Station, boolean> = { kitchen: false, bar: false }
+          const attempted = new Set<Station>()
           for (const [key, groupItems] of groups) {
             const [sessionId, ticketNoStr, station] = key.split(':') as [string, string, Station]
             if (stationDown[station]) continue
+            attempted.add(station)
             const tableRef = refById.get(sessionId) ?? '?'
             const bytes = buildKitchenTicket({
               tableRef,
@@ -253,17 +255,19 @@ export function useKitchenPrintService() {
               .in('id', groupItems.map((i) => i.id))
             await new Promise((r) => setTimeout(r, 300)) // let the printer breathe
           }
-          // A station this machine doesn't serve is reported OK — its badge
-          // is hidden anyway, and "offline" would be a lie about a printer
-          // this till was never asked to reach.
-          usePrinter.getState().setKitchenOnline(!plan.includes('kitchen') || !stationDown.kitchen)
-          // When the bar falls back to the kitchen printer it shares that
-          // printer's status — that's where its tickets actually went.
-          usePrinter
-            .getState()
-            .setBarOnline(
-              !plan.includes('bar') || !(barPrinterName ? stationDown.bar : stationDown.kitchen),
-            )
+          // Only report on stations we actually attempted this pass. A
+          // station with nothing queued keeps whatever it last proved.
+          const setHealth = (st: Station, h: 'ok' | 'down') =>
+            st === 'kitchen'
+              ? usePrinter.getState().setKitchenHealth(h)
+              : usePrinter.getState().setBarHealth(h)
+          for (const st of plan) {
+            if (!attempted.has(st)) continue
+            // When the bar falls back to the kitchen printer it shares that
+            // printer's fate — that's where its tickets actually went.
+            const failed = st === 'bar' && !barPrinterName ? stationDown.kitchen : stationDown[st]
+            setHealth(st, failed ? 'down' : 'ok')
+          }
           if (stationDown.kitchen || stationDown.bar) break
         }
       } finally {

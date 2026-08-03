@@ -52,9 +52,15 @@ import {
   transferItems,
 } from '../state/actions'
 import type { BillStation } from '../lib/print'
-import { printBill, printFriendStatement } from '../lib/print'
-import { inTauri, listPrinters } from '../lib/tauri'
-import { usePrinter, type PaperWidth, type TillRole } from '../state/printer'
+import { buildTestTicket, printBill, printFriendStatement } from '../lib/print'
+import { inTauri, listPrinters, sendToPrinter } from '../lib/tauri'
+import {
+  usePrinter,
+  columnsFor,
+  type PaperWidth,
+  type StationHealth,
+  type TillRole,
+} from '../state/printer'
 import { stationsFor } from '../lib/kitchenPrintService'
 import { money } from '../lib/format'
 import { todayKey } from '../lib/serviceDay'
@@ -289,27 +295,44 @@ export function CaisseHome() {
 /** Small badge telling the cashier whether kitchen tickets are printing —
  * the only screen anywhere near the kitchen printer. */
 function PrinterStatus() {
-  const { kitchenOnline, barOnline, barPrinterName, tillRole, queued } = usePrinter()
+  const { kitchenHealth, barHealth, barPrinterName, tillRole, queued } = usePrinter()
   const t = useI18n((s) => s.t)
   const stations = stationsFor(tillRole, barPrinterName)
   if (!inTauri()) return null
-  const chip = (ok: boolean, okLabel: string, downLabel: string) => (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
-        ok ? 'bg-st-served-soft text-st-served' : 'bg-red-100 text-danger'
-      }`}
-    >
-      {ok ? <PrinterCheck size={14} /> : <Printer size={14} />}
-      {ok ? okLabel : `${downLabel}${queued > 0 ? ` · ${queued}` : ''}`}
-    </span>
-  )
+  // The badge says what is KNOWN, never more. "OK" means a ticket really
+  // came out; a printer nothing has been sent to yet says so rather than
+  // implying a working connection.
+  const chip = (health: StationHealth, name: string) => {
+    const style =
+      health === 'ok'
+        ? 'bg-st-served-soft text-st-served'
+        : health === 'down'
+          ? 'bg-red-100 text-danger'
+          : 'bg-amber-100 text-amber-800'
+    const label =
+      health === 'ok'
+        ? `${name} ${t('printerHealthOk')}`
+        : health === 'down'
+          ? `${name} ${t('printerHealthDown')}${queued > 0 ? ` · ${queued}` : ''}`
+          : health === 'unset'
+            ? `${name} ${t('printerHealthUnset')}`
+            : `${name} ${t('printerHealthUntested')}`
+    return (
+      <span
+        key={name}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${style}`}
+      >
+        {health === 'ok' ? <PrinterCheck size={14} /> : <Printer size={14} />}
+        {label}
+      </span>
+    )
+  }
   return (
     <span className="inline-flex items-center gap-1.5">
       {/* only the stations THIS till is responsible for — the bar's till has
           no business showing a kitchen badge, and vice versa */}
-      {stations.includes('kitchen') &&
-        chip(kitchenOnline, t('kitchenPrinterOk'), t('kitchenPrinterOffline'))}
-      {stations.includes('bar') && chip(barOnline, t('barPrinterOk'), t('barPrinterOffline'))}
+      {stations.includes('kitchen') && chip(kitchenHealth, t('stationCuisine'))}
+      {stations.includes('bar') && chip(barHealth, t('stationBar'))}
     </span>
   )
 }
@@ -354,17 +377,45 @@ function WindowsPrinterPicker({
   // A value Windows doesn't know (typically an IP) means this station was
   // already set by hand — come back to the text box, not an empty dropdown.
   const [manual, setManual] = useState(Boolean(value) && !printers.includes(value))
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const paperWidth = usePrinter((s) => s.paperWidth)
+
+  const runTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      await sendToPrinter(value, buildTestTicket(label, columnsFor(paperWidth)))
+      setTestResult({ ok: true, msg: t('printerTestOk') })
+    } catch (e) {
+      setTestResult({ ok: false, msg: `${t('printerTestFailed')} — ${String(e)}` })
+    } finally {
+      setTesting(false)
+    }
+  }
   return (
     <label>
-      <span className="mb-1 flex items-center justify-between text-xs font-bold text-ink-2">
-        {label}
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-full border border-line-2 px-2.5 py-1 text-[11px] font-bold text-ink-2 hover:bg-surface-2"
-        >
-          ↻ {t('refreshList')}
-        </button>
+      <span className="mb-1 flex items-center justify-between gap-2 text-xs font-bold text-ink-2">
+        <span className="min-w-0 truncate">{label}</span>
+        <span className="flex shrink-0 gap-1.5">
+          {/* The only honest way to answer "is this the right printer?" — the
+              badges can only report on tickets that happened to be queued. */}
+          <button
+            type="button"
+            disabled={!value || testing}
+            onClick={() => void runTest()}
+            className="rounded-full border border-line-2 px-2.5 py-1 text-[11px] font-bold text-ink-2 hover:bg-surface-2 disabled:opacity-40"
+          >
+            {testing ? '…' : t('printerTest')}
+          </button>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="rounded-full border border-line-2 px-2.5 py-1 text-[11px] font-bold text-ink-2 hover:bg-surface-2"
+          >
+            ↻ {t('refreshList')}
+          </button>
+        </span>
       </span>
       <p className="mb-1.5 text-[12px] text-ink-3">{hint}</p>
       {printers.length > 0 && !manual ? (
@@ -377,9 +428,13 @@ function WindowsPrinterPicker({
           }}
         >
           <option value="">—</option>
-          {/* keep a previously saved printer selectable even if it is
-              currently offline / not enumerated */}
-          {value && !printers.includes(value) && <option value={value}>{value}</option>}
+          {/* A previously saved printer that Windows is NOT reporting. It
+              stays selectable so an offline printer isn't silently dropped,
+              but it must not look like a real one — an unrecognised name in
+              this list is otherwise indistinguishable from a live printer. */}
+          {value && !printers.includes(value) && (
+            <option value={value}>{`${value} — ${t('printerNotDetected')}`}</option>
+          )}
           {printers.map((name) => (
             <option key={name} value={name}>
               {name}
@@ -414,6 +469,15 @@ function WindowsPrinterPicker({
             </>
           )}
         </>
+      )}
+      {testResult && (
+        <p
+          className={`mt-1 text-[12px] font-semibold ${
+            testResult.ok ? 'text-st-served' : 'text-danger'
+          }`}
+        >
+          {testResult.msg}
+        </p>
       )}
     </label>
   )

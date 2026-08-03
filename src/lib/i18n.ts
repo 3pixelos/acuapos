@@ -163,8 +163,26 @@ const dict = {
     'Cobros (sin VIP ni personal)',
   ],
   // printers (caisse desktop app)
-  kitchenPrinterOk: ['Cuisine OK', 'Kitchen OK', 'Cocina OK'],
-  kitchenPrinterOffline: ['Cuisine hors ligne', 'Kitchen offline', 'Cocina sin conexión'],
+  stationCuisine: ['Cuisine', 'Kitchen', 'Cocina'],
+  stationBar: ['Bar', 'Bar', 'Barra'],
+  // What the badge KNOWS — never more. "OK" is only ever shown once a ticket
+  // has really come out of that printer.
+  printerHealthOk: ['OK', 'OK', 'OK'],
+  printerHealthDown: ['hors ligne', 'offline', 'sin conexión'],
+  printerHealthUnset: ['non configurée', 'not set', 'sin configurar'],
+  printerHealthUntested: ['non testée', 'untested', 'sin probar'],
+  printerTest: ['Tester', 'Test', 'Probar'],
+  printerTestOk: [
+    '✓ Envoyé — si le ticket sort, c’est la bonne imprimante.',
+    '✓ Sent — if a ticket comes out, this is the right printer.',
+    '✓ Enviado — si sale un ticket, esta es la impresora correcta.',
+  ],
+  printerTestFailed: ['✕ Échec', '✕ Failed', '✕ Error'],
+  printerNotDetected: [
+    'non détectée par Windows',
+    'not detected by Windows',
+    'no detectada por Windows',
+  ],
   printerSettings: ['Imprimantes', 'Printers', 'Impresoras'],
   printerSettingsHint: [
     'Ce qui s’imprime où suit la carte : les catégories « Cuisine » partent en cuisine, « Bar » au bar. Réglages propres à cet appareil.',
@@ -204,8 +222,6 @@ const dict = {
     'It receives the drinks and the bills of the Bar floor’s tables. Empty = everything goes to the kitchen.',
     'Recibe las bebidas y las cuentas de las mesas de la Barra. Vacío = todo va a cocina.',
   ],
-  barPrinterOk: ['Bar OK', 'Bar OK', 'Barra OK'],
-  barPrinterOffline: ['Bar hors ligne', 'Bar offline', 'Barra sin conexión'],
   cashierPrinterName: ['Imprimante caisse', 'Cashier printer', 'Impresora de caja'],
   refreshList: ['Actualiser', 'Refresh', 'Actualizar'],
   printerListEmptyHint: [

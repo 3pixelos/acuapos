@@ -19,6 +19,20 @@ export type PaperWidth = 58 | 80
 export type TillRole = 'main' | 'bar'
 
 /**
+ * What we actually KNOW about a station's printer. It used to be a boolean
+ * that started `true` and was reset to `true` on every empty queue, so a till
+ * with no printer configured at all cheerfully showed "Cuisine OK" — the one
+ * moment the badge is read is while setting a printer up, which is exactly
+ * when it was least truthful.
+ *
+ *   unset    — no printer chosen for this station
+ *   untested — chosen, but nothing has been sent to it yet on this device
+ *   ok       — something printed successfully
+ *   down     — the last attempt failed; tickets are queued
+ */
+export type StationHealth = 'unset' | 'untested' | 'ok' | 'down'
+
+/**
  * The three printers, configured identically: each holds either a
  * Windows-installed printer NAME or an IP address, and `sendToPrinter`
  * picks the transport from the value's shape. The settings screen is
@@ -42,8 +56,8 @@ interface PrinterState {
   paperWidth: PaperWidth
   /** Live status of the ticket printers, surfaced as badges on the Caisse
    * UI (there's no screen at the kitchen/bar to show it). Not persisted. */
-  kitchenOnline: boolean
-  barOnline: boolean
+  kitchenHealth: StationHealth
+  barHealth: StationHealth
   /** How many unprinted tickets are currently queued/failing. */
   queued: number
   setConfig: (c: {
@@ -53,8 +67,8 @@ interface PrinterState {
     tillRole?: TillRole
     paperWidth?: PaperWidth
   }) => void
-  setKitchenOnline: (online: boolean) => void
-  setBarOnline: (online: boolean) => void
+  setKitchenHealth: (h: StationHealth) => void
+  setBarHealth: (h: StationHealth) => void
   setQueued: (n: number) => void
   /** Which location's printer set is currently loaded. Loaded on login; null
    * before anyone has signed in. */
@@ -150,8 +164,8 @@ function persist(branch: Branch | null, s: StoredConfig) {
 
 export const usePrinter = create<PrinterState>((set, get) => ({
   ...restore(),
-  kitchenOnline: true,
-  barOnline: true,
+  kitchenHealth: 'untested',
+  barHealth: 'untested',
   queued: 0,
   setConfig: (c) => {
     const next: StoredConfig = {
@@ -170,8 +184,8 @@ export const usePrinter = create<PrinterState>((set, get) => ({
     if (get().branch === branch) return
     set({ branch, ...restoreForBranch(branch) })
   },
-  setKitchenOnline: (kitchenOnline) => set({ kitchenOnline }),
-  setBarOnline: (barOnline) => set({ barOnline }),
+  setKitchenHealth: (kitchenHealth) => set({ kitchenHealth }),
+  setBarHealth: (barHealth) => set({ barHealth }),
   setQueued: (queued) => set({ queued }),
 }))
 
