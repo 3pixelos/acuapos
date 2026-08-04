@@ -32,9 +32,17 @@
       Deliberately written in ES5 with no bundler involvement, so it still
       runs on the very browsers that can't run the app.
     -->
+    <!-- Runs ONLY on a browser with no ES-module support. That is the exact
+         line between "takes the modern bundle" and "takes the legacy one",
+         and knowing which side a handset is on turns a blank screen into a
+         one-word answer. -->
+    <script nomodule>
+      window.__acuaNoModules = true
+    </script>
     <script>
       (function () {
         var reported = false
+        var failedUrl = ''
         function show(title, detail) {
           if (reported) return
           reported = true
@@ -72,15 +80,47 @@
         window.addEventListener('error', function (ev) {
           window.__acuaBootError(ev.error || ev.message)
         })
+        // Capture phase, because a <script> that fails to DOWNLOAD fires an
+        // error that does not bubble — the listener above never sees it, and
+        // the boot simply stalls. This is what tells a dead network apart
+        // from a browser that ran the code and threw.
+        window.addEventListener(
+          'error',
+          function (ev) {
+            var t = ev.target
+            if (t && t !== window && (t.src || t.href)) failedUrl = t.src || t.href
+          },
+          true
+        )
         // Nothing rendered after 12s means the bundle never ran at all.
         setTimeout(function () {
           var root = document.getElementById('root')
-          if (root && !root.firstChild) {
+          if (root && root.firstChild) return
+          if (failedUrl) {
+            show(
+              'Connexion impossible',
+              "Le téléphone n'a pas pu télécharger l'application. Vérifiez le Wi-Fi puis rouvrez."
+            )
+          } else if (window.__acuaNoModules) {
+            // The legacy bundle exists for exactly this browser, so reaching
+            // here means even that failed to run.
+            show(
+              'Téléphone trop ancien',
+              'Le navigateur de cet appareil est trop ancien. Mettez à jour ' +
+                '"Android System WebView" et Chrome depuis le Play Store, puis rouvrez. ' +
+                "Sinon, utilisez un téléphone plus récent."
+            )
+          } else {
             show(
               'Impossible de charger',
-              "L'application n'a pas répondu. Vérifiez la connexion Wi-Fi, " +
-                'ou mettez à jour "Android System WebView" si le téléphone est ancien.'
+              "L'application n'a pas répondu. Vérifiez la connexion Wi-Fi puis rouvrez."
             )
+          }
+          var el = document.getElementById('boot-err')
+          if (el) {
+            el.textContent =
+              (window.__acuaNoModules ? 'legacy' : 'modern') +
+              (failedUrl ? ' · échec: ' + failedUrl : '')
           }
         }, 12000)
       })()

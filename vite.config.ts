@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 import tailwindcss from '@tailwindcss/vite'
 
 // Unique id per build, baked into the bundle AND emitted as version.json.
@@ -16,7 +17,27 @@ const versionFile = (): Plugin => ({
 })
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), versionFile()],
+  plugins: [
+    react(),
+    // Lowering the build target fixed the SYNTAX, but Vite still shipped the
+    // app as <script type="module"> — and a WebView older than Chrome 61
+    // doesn't just fail on those, it IGNORES them. No error, no exception,
+    // nothing to catch: the tag is skipped and the page stays blank. That is
+    // why the older handsets still showed nothing after the target change.
+    //
+    // This emits a SECOND, classic-script copy of the app marked `nomodule`,
+    // which is the only thing such a browser will run, plus the core-js
+    // polyfills those builds need. Modern phones ignore the legacy bundle
+    // entirely and are unaffected — they never download it.
+    legacy({
+      targets: ['chrome >= 55', 'android >= 5', 'safari >= 11'],
+      // The two features that decide whether a browser takes the modern
+      // bundle or the legacy one. Anything missing either gets legacy.
+      modernPolyfills: true,
+    }),
+    tailwindcss(),
+    versionFile(),
+  ],
   define: { __BUILD_ID__: JSON.stringify(buildId) },
   build: {
     // The waiters' phones are not all new. Vite's default target assumes a
