@@ -18,4 +18,17 @@ const versionFile = (): Plugin => ({
 export default defineConfig({
   plugins: [react(), tailwindcss(), versionFile()],
   define: { __BUILD_ID__: JSON.stringify(buildId) },
+  build: {
+    // The waiters' phones are not all new. Vite's default target assumes a
+    // browser that understands `?.`, `??` and `??=` — Chrome 80, which is
+    // Android 10. An older handset's WebView hits the first `?.`, throws a
+    // SyntaxError before a single line runs, and shows a blank white page
+    // with no clue why. Lowering the target makes esbuild rewrite that
+    // syntax, at the cost of a slightly larger bundle.
+    //
+    // This only covers SYNTAX. Missing runtime APIs on a genuinely ancient
+    // WebView would still fail — but the boot guard in index.html now says
+    // so out loud instead of showing white.
+    target: ['es2015', 'chrome58', 'safari11'],
+  },
 })

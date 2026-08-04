@@ -19,6 +19,72 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Runtime APIs the older phones lack. A classic script, so it runs
+         before the deferred module below. See public/compat.js. -->
+    <script src="/compat.js"></script>
+    <!--
+      Boot guard. A phone whose WebView can't run the app used to show a
+      blank white page — no message, nothing in the UI to report, and no way
+      to tell "old phone" from "no internet" from "site down" without
+      plugging the handset into a laptop. This catches the failure and says
+      which it is, on the screen of the device that has the problem.
+
+      Deliberately written in ES5 with no bundler involvement, so it still
+      runs on the very browsers that can't run the app.
+    -->
+    <script>
+      (function () {
+        var reported = false
+        function show(title, detail) {
+          if (reported) return
+          reported = true
+          var root = document.getElementById('root')
+          if (!root) return
+          root.innerHTML =
+            '<div style="font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#3b3b3b;' +
+            'padding:24px;max-width:34em;margin:0 auto">' +
+            '<div style="font-size:26px;font-weight:800;letter-spacing:.14em;color:#22b3c6">ACUA</div>' +
+            '<h1 style="font-size:17px;margin:18px 0 8px">' + title + '</h1>' +
+            '<p style="margin:0 0 14px">' + detail + '</p>' +
+            '<p style="font-size:12px;color:#8a8a8a;word-break:break-all" id="boot-err"></p>' +
+            '</div>'
+        }
+        window.__acuaBootError = function (e) {
+          var msg = (e && (e.message || e)) + ''
+          // A parse error means the browser itself is too old — every other
+          // failure is worth showing verbatim.
+          if (/SyntaxError|Unexpected token|Unexpected identifier/i.test(msg)) {
+            show(
+              'Téléphone trop ancien',
+              "Le navigateur de cet appareil est trop ancien pour l'application. " +
+                'Mettez à jour "Android System WebView" et Chrome depuis le Play Store, ' +
+                "puis rouvrez l'app. Si ce n'est pas possible, utilisez un téléphone plus récent."
+            )
+          } else {
+            show(
+              'Impossible de charger',
+              "L'application n'a pas pu démarrer. Vérifiez la connexion Wi-Fi puis rouvrez."
+            )
+          }
+          var el = document.getElementById('boot-err')
+          if (el) el.textContent = msg
+        }
+        window.addEventListener('error', function (ev) {
+          window.__acuaBootError(ev.error || ev.message)
+        })
+        // Nothing rendered after 12s means the bundle never ran at all.
+        setTimeout(function () {
+          var root = document.getElementById('root')
+          if (root && !root.firstChild) {
+            show(
+              'Impossible de charger',
+              "L'application n'a pas répondu. Vérifiez la connexion Wi-Fi, " +
+                'ou mettez à jour "Android System WebView" si le téléphone est ancien.'
+            )
+          }
+        }, 12000)
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
