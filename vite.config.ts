@@ -30,9 +30,16 @@ export default defineConfig({
     // polyfills those builds need. Modern phones ignore the legacy bundle
     // entirely and are unaffected — they never download it.
     legacy({
-      targets: ['chrome >= 55', 'android >= 5', 'safari >= 11'],
-      // The two features that decide whether a browser takes the modern
-      // bundle or the legacy one. Anything missing either gets legacy.
+      // CHROME 49 IS THE FLOOR, and no build setting can move it. The app
+      // uses Proxy (6 sites) and Reflect.construct (8) by way of its
+      // dependencies, and neither can be polyfilled — they need engine
+      // support. Proxy landed in Chrome 49. Targeting anything older just
+      // produces a bundle that parses and then dies on the first render.
+      //
+      // So this targets exactly that floor. A phone below it cannot run the
+      // app at all; the boot guard reports its Chrome version so that is a
+      // fact on screen rather than a guess.
+      targets: ['chrome >= 49', 'android >= 5', 'safari >= 10', 'ios >= 10'],
       modernPolyfills: true,
     }),
     tailwindcss(),
@@ -50,6 +57,10 @@ export default defineConfig({
     // This only covers SYNTAX. Missing runtime APIs on a genuinely ancient
     // WebView would still fail — but the boot guard in index.html now says
     // so out loud instead of showing white.
-    target: ['es2015', 'chrome58', 'safari11'],
+    //
+    // Matches the legacy floor. This has to be set HERE as well as in the
+    // legacy plugin: Babel down-levels the legacy chunks, and then the
+    // minifier re-modernises them back up to whatever this says.
+    target: ['chrome49'],
   },
 })

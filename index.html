@@ -118,8 +118,13 @@
           }
           var el = document.getElementById('boot-err')
           if (el) {
+            // The browser's own version, on screen. One photo of this beats
+            // any amount of guessing about which WebView a handset is on —
+            // and below Chrome 49 the answer is simply "this phone can't".
+            var m = /Chrome\/(\d+)/.exec(navigator.userAgent)
             el.textContent =
-              (window.__acuaNoModules ? 'legacy' : 'modern') +
+              (m ? 'Chrome ' + m[1] + (Number(m[1]) < 49 ? ' — trop ancien (49 minimum)' : '') : '') +
+              ' · ' + (window.__acuaNoModules ? 'legacy' : 'modern') +
               (failedUrl ? ' · échec: ' + failedUrl : '')
           }
         }, 12000)
