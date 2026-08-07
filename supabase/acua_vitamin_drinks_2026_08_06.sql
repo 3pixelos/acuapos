@@ -1,7 +1,7 @@
 -- ============================================================
 -- Acua POS — Vitamin Well + NOCCO on the bar menu (2026-08-06)
 --
--- Six bottled drinks from the House of Nutrition delivery, all at 5,00 €.
+-- Five bottled drinks from the House of Nutrition delivery, all at 5,00 €.
 -- They go in their own bar category, so `main = 'drinks'` puts them under the
 -- BAR tab and prints them on the bar printer, like everything else there.
 --
@@ -28,8 +28,10 @@ from (values
   ('Vitamin Well Sport',        '0,5 L',                        2),
   ('Vitamin Well Antioxidant',  'Pêche · 0,5 L',                3),
   ('Vitamin Well Zero Lemon',   'Citron, sans sucre · 0,5 L',   4),
-  ('Vitamin Well Zero Peach',   'Pêche, sans sucre · 0,5 L',    5),
-  ('NOCCO BCAA Miami Strawberry', 'Fraise · 0,33 L',            6)
+  ('Vitamin Well Zero Peach',   'Pêche, sans sucre · 0,5 L',    5)
+  -- NOCCO BCAA Miami Strawberry was here and was dropped the same day
+  -- (see acua_remove_nocco_2026_08_06.sql). Removed from this list too, so
+  -- re-running this file cannot quietly bring it back.
 ) as v(name, descr, sort)
 join menu_categories c on c.name_fr = 'Boissons Vitaminées'
 where not exists (
@@ -39,7 +41,7 @@ where not exists (
 commit;
 
 -- ---------- verify ----------
--- Expect 6 items at 5,00 €, all sellable (no menu_stock row = available).
+-- Expect 5 items at 5,00 €, all sellable (no menu_stock row = available).
 select mi.sort, mi.name, mi.description, mi.price,
        coalesce(ms.available, true) as disponible
 from menu_items mi
