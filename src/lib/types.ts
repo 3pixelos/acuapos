@@ -267,14 +267,23 @@ export function autoIncludedDrinkFor(itemName: string) {
   return AUTO_INCLUDED_DRINKS.find((d) => d.item.toLowerCase() === n) ?? null
 }
 
-/** Items the BARMAN makes even though their menu category isn't a drinks
- * one (e.g. Mini Orange lives in Extras Breakfast). Matched on the item
- * name, case-insensitively — their ticket lines print at the bar. */
+/**
+ * Items the BARMAN makes even though their menu category isn't a drinks one.
+ * Matched on the item name, case-insensitively — their ticket lines print at
+ * the bar while the item stays where the waiters expect to find it on the
+ * menu.
+ *
+ * This is for the odd item out. When a WHOLE category belongs to the bar,
+ * change that category's `main` to 'drinks' instead — it moves the printing
+ * and the menu tab together, and needs no code.
+ *
+ * (The four names here before were Beymen's — Mini Orange, Granula and the
+ * fruit salads — none of which exist on Acua's menu.)
+ */
 export const BAR_ROUTED_ITEM_NAMES = [
-  'Mini Orange',
-  'Granula',
-  'Mini Salade de Fruits',
-  'Salade de Fruits',
+  // Sits with the other Signature Sandwiches, which the kitchen makes; this
+  // one the barman does.
+  'Egg Mousse (Bagel)',
 ]
 
 /** [fr, en] labels of the drinks a customer can pick with an included-drink
