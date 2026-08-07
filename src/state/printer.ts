@@ -19,43 +19,67 @@ export type PaperWidth = 58 | 80
 export type TillRole = 'main' | 'bar'
 
 /**
- * THE BAR PRINTER IS OUT OF SERVICE (2026-08-03).
+ * WHICH PRINTERS ARE PHYSICALLY IN SERVICE, as of 2026-08-05.
  *
- * The till already has a printer name typed into the bar field and there is
- * nobody on site to clear it, so the app has to ignore it from here instead.
- * While this is true every station behaves as if no bar printer had ever been
- * configured, which the existing fallbacks already handle correctly:
+ * The restaurant only owns so many printers, and they move. Rather than
+ * scattering ad-hoc flags around, this is the one place that records what is
+ * actually plugged in; everything else derives from it.
  *
- *   - drink tickets print at the KITCHEN, alongside the food
- *   - a Bar-floor addition prints at the CAISSE
- *   - the bar status badge disappears, because there is no bar station
+ * TODAY: the caisse printer has been carried over to the BAR. It has no LAN
+ * port, so it hangs off the bar's own till by USB, and the main till has no
+ * receipt printer at all for a few days. That means the bar prints the drink
+ * tickets AND every addition in the building.
  *
- * The stored value is left untouched, not wiped — flipping this back to
- * false is the only edit needed to bring the real bar printer into service,
- * and whatever was typed will still be there.
+ * When the caisse printer goes back to the main till, set `caisse` to true —
+ * that is the whole change. Nothing is wiped in the meantime: each till keeps
+ * whatever is typed in its settings, so the old arrangement returns intact.
  */
-export const BAR_PRINTER_DISABLED = true
+export const PRINTERS_IN_SERVICE = {
+  /** LAN, food tickets. Never moved. */
+  kitchen: true,
+  /** USB on the bar's till. Drink tickets + every addition. */
+  bar: true,
+  /** Moved to the bar 2026-08-05. Back in a few days. */
+  caisse: false,
+} as const
 
-/** The bar printer the app should actually print to — empty while the bar
+/** The bar printer the app should actually print to — empty when the bar
  * printer is out of service. Read this, never `barPrinterName`, anywhere a
  * ticket or a bill is about to be sent. */
 export const effectiveBarPrinter = (barPrinterName: string) =>
-  BAR_PRINTER_DISABLED ? '' : barPrinterName
+  PRINTERS_IN_SERVICE.bar ? barPrinterName : ''
+
+/**
+ * Which printer a receipt goes to — bills, friend statements, the
+ * fin-de-journée.
+ *
+ * Normally a Bar-floor table's addition prints at the bar and everything
+ * else at the caisse. With the caisse printer off the floor there is only
+ * one receipt printer left, so EVERY addition goes to the bar; sending them
+ * to a machine that isn't plugged in would just queue them into nothing.
+ *
+ * Falls back to whatever the till has as its cashier printer, so a device
+ * that never had the bar printer configured still prints somewhere rather
+ * than failing silently.
+ */
+export function receiptPrinterFor(
+  station: 'cashier' | 'bar',
+  cashierPrinterName: string,
+  barPrinterName: string,
+): string {
+  const bar = effectiveBarPrinter(barPrinterName)
+  if (!PRINTERS_IN_SERVICE.caisse) return bar || cashierPrinterName
+  return station === 'bar' ? bar || cashierPrinterName : cashierPrinterName
+}
 
 /**
  * The till's role is used as-is, and that is deliberate.
  *
- * An earlier version of this forced every till to `main` while the bar
- * printer was out of service, reasoning that a till stuck on `bar` would
- * have nowhere to send its tickets. That was backwards: with the bar out of
- * service the MAIN till already prints both stations, so overriding the role
- * made a second machine claim the same tickets and print everything twice —
- * the exact failure the role was introduced to prevent.
- *
- * A till set to `bar` standing down is the correct behaviour here: its work
- * is being done by the main till. It reports "Bar non configurée" rather
- * than pretending, so a single-till setup left on `bar` by mistake is
- * visible instead of silent.
+ * An earlier version forced every till to `main` while the bar printer was
+ * out of service, reasoning that a till stuck on `bar` would have nowhere to
+ * send its tickets. That was backwards: it made a second machine claim the
+ * same tickets and print everything twice — the exact failure the role was
+ * introduced to prevent.
  */
 export const effectiveTillRole = (tillRole: TillRole): TillRole => tillRole
 

@@ -3,7 +3,7 @@ import { INCLUDED_DRINK_CATEGORY } from './types'
 import { money } from './format'
 import { EscPos, lr } from './escpos'
 import { inTauri, sendToPrinter } from './tauri'
-import { usePrinter, columnsFor, effectiveBarPrinter } from '../state/printer'
+import { usePrinter, columnsFor, receiptPrinterFor } from '../state/printer'
 import {
   RECEIPT_LOGO_HEIGHT,
   RECEIPT_LOGO_PNG,
@@ -297,7 +297,10 @@ export function buildFriendStatement(d: FriendStatementData, cols = 42): Uint8Ar
 export async function printFriendStatement(d: FriendStatementData): Promise<void> {
   const { cashierPrinterName, paperWidth } = usePrinter.getState()
   if (inTauri() && cashierPrinterName) {
-    await sendToPrinter(cashierPrinterName, buildFriendStatement(d, columnsFor(paperWidth)))
+    await sendToPrinter(
+      receiptPrinterFor('cashier', cashierPrinterName, usePrinter.getState().barPrinterName),
+      buildFriendStatement(d, columnsFor(paperWidth)),
+    )
     return
   }
   printFriendStatementHtml(d)
@@ -472,7 +475,10 @@ export async function printSalesReport(d: SalesReportData): Promise<void> {
   const { cashierPrinterName, paperWidth } = usePrinter.getState()
   const cols = columnsFor(paperWidth)
   if (inTauri() && cashierPrinterName) {
-    await sendToPrinter(cashierPrinterName, buildSalesReport(d, cols))
+    await sendToPrinter(
+      receiptPrinterFor('cashier', cashierPrinterName, usePrinter.getState().barPrinterName),
+      buildSalesReport(d, cols),
+    )
     return
   }
   printSalesReportHtml(d)
@@ -559,10 +565,8 @@ export async function printBill(
   station: BillStation = 'cashier',
 ): Promise<number> {
   const stripped = items.filter((i) => !sentToKitchen(i) && !i.voided).length
-  const { cashierPrinterName, paperWidth } = usePrinter.getState()
-  // Out of service -> empty -> a Bar-floor addition falls back to the caisse.
-  const barPrinterName = effectiveBarPrinter(usePrinter.getState().barPrinterName)
-  const target = station === 'bar' ? barPrinterName || cashierPrinterName : cashierPrinterName
+  const { cashierPrinterName, barPrinterName, paperWidth } = usePrinter.getState()
+  const target = receiptPrinterFor(station, cashierPrinterName, barPrinterName)
   if (inTauri() && target) {
     await sendToPrinter(target, buildBill(tableRef, items, meta, columnsFor(paperWidth)))
     return stripped

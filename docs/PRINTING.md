@@ -6,9 +6,16 @@ Acua runs **three** printers:
 
 | Printer | What it prints |
 | --- | --- |
-| **Kitchen** | Food tickets — everything in a `food` menu category |
+| **Kitchen** | Food tickets — everything in a `food` or `breakfast` menu category |
 | **Bar** | Drink tickets (`drinks` categories) **and** the bill of any table on the **Bar** floor |
 | **Caisse** | The full customer bills for every other floor, friend statements, the fin-de-journée |
+
+> **Right now (from 2026-08-05) the caisse printer has been moved to the bar.**
+> It has no LAN port, so it hangs off the bar's till by USB, and the main till
+> has no receipt printer at all. While that is true, **every** addition prints
+> at the bar, not just the Bar floor's — so bills should be printed **from the
+> bar till**, which is the machine the printer is attached to. `PRINTERS_IN_SERVICE`
+> in `src/state/printer.ts` records this; set `caisse: true` when it goes back.
 
 All three are configured identically: one dropdown of the printers Windows
 has installed. A printer can also be given a **bare IP** — pick *Autre…* and

@@ -57,7 +57,7 @@ import { inTauri, listPrinters, sendToPrinter } from '../lib/tauri'
 import {
   usePrinter,
   columnsFor,
-  BAR_PRINTER_DISABLED,
+  PRINTERS_IN_SERVICE,
   effectiveBarPrinter,
   effectiveTillRole,
   type PaperWidth,
@@ -622,9 +622,9 @@ function PrinterSettings({ onClose }: { onClose: () => void }) {
           listErr={listErr}
           onRefresh={loadPrinters}
         />
-        {BAR_PRINTER_DISABLED && (
+        {!PRINTERS_IN_SERVICE.caisse && (
           <p className="rounded-xl bg-amber-100 px-3 py-2 text-[12px] font-semibold text-amber-800">
-            {t('barPrinterDisabled')}
+            {t('caissePrinterMoved')}
           </p>
         )}
         <WindowsPrinterPicker
