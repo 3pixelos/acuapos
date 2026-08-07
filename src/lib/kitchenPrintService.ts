@@ -7,6 +7,7 @@ import {
   columnsFor,
   effectiveBarPrinter,
   effectiveTillRole,
+  PRINTERS_IN_SERVICE,
   type TillRole,
 } from '../state/printer'
 import { deviceBranch } from '../state/auth'
@@ -52,9 +53,17 @@ export type Station = 'kitchen' | 'bar'
  * Pure and exported because this is the piece that decides whether two tills
  * cooperate or double-print everything.
  */
-export function stationsFor(role: TillRole, barPrinterName: string): Station[] {
+export function stationsFor(role: TillRole, _barPrinterName?: string): Station[] {
   if (role === 'bar') return ['bar']
-  return barPrinterName ? ['kitchen'] : ['kitchen', 'bar']
+  // The main till takes the drinks ONLY when no bar printer exists anywhere.
+  //
+  // This used to ask whether THIS machine had a bar printer configured, which
+  // is the wrong question once there are two tills: the bar printer lives on
+  // the bar's machine, so the main till's own field is empty — and it went on
+  // claiming the drink tickets and pushing them out of the kitchen printer,
+  // while the bar stood waiting for them. Whether the bar is served is a fact
+  // about the restaurant, not about this device.
+  return PRINTERS_IN_SERVICE.bar ? ['kitchen'] : ['kitchen', 'bar']
 }
 
 export function useKitchenPrintService() {
